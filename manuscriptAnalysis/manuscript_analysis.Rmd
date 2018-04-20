@@ -1,0 +1,2507 @@
+---
+title: "Manuscript Analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+# Generate Dataframes
+
+## Read Data and setup allphewas_both
+
+```{r,echo=FALSE, warning=FALSE, message=FALSE}
+library(stringr)
+library(tidyverse)
+library(purrr)
+library(metafor)
+library(ggthemes)
+library(ggpubr)
+library(ggExtra)
+library(xlsx)
+library(DT)
+library(broom)
+
+FF <-	17919
+MF <- 	20642
+MM <- 	17835
+
+
+p_mz <- 1-(2*MF/(MM+FF+MF))
+
+p_ss <- (FF+MM)/(MM+FF+MF)
+
+p <- p_mz/p_ss
+
+
+
+demographic_information <- read_delim("~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/demographic_information/demographic_information_2.txt","\t", escape_double = FALSE, trim_ws = TRUE)
+
+
+phewas_functional_domain_map <- readRDS( file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/match_phewas_mapping/functional_domain/phewas_functional_domain_map.rds')
+
+phewas <- read.table("~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/phewasAllDescription.csv", header=TRUE)
+
+
+allphewas_binary <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/twin_binary.csv", 
+    " ", escape_double = FALSE, col_names = FALSE, 
+    trim_ws = TRUE)
+
+names(allphewas_binary) <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/names_binary.rds')
+
+
+allphewas_binary <- allphewas_binary %>% 
+  mutate(h2_liab_SE_se = ifelse(phewas_code == '984',h2_SE,h2_liab_SE_se)) %>%
+  mutate(rliabss_SE_se = ifelse(phewas_code == '984',r_SS_SE,rliabss_SE_se)) %>%
+  mutate(c2_liab_SE_se = ifelse(phewas_code == '984',c2_SE,c2_liab_SE_se)) %>%
+    mutate(rliabos_SE_se = ifelse(phewas_code == '984',r_OS_SE,rliabos_SE_se)) 
+
+
+names(allphewas_binary) <- sub("_se", "", names(allphewas_binary))
+
+
+
+allphewas_binary <- allphewas_binary %>% inner_join(phewas, ., by='phewas_code') 
+
+
+
+
+
+allphewas_quant_pheno <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/twin_quant.csv", 
+    " ", escape_double = FALSE, col_names = FALSE, 
+    trim_ws = TRUE)
+
+
+names(allphewas_quant_pheno) <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/names_quant.rds')
+
+
+names(allphewas_quant_pheno) <- sub("_se", "", names(allphewas_quant_pheno))
+
+
+
+
+quant_pheno_description <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/h2_c2_estimates/quant_pheno_description.txt", "\t", escape_double = FALSE, col_types = cols(phewas_code = col_character()), trim_ws = TRUE)
+
+
+quant_pheno_description <- quant_pheno_description %>% group_by(phewas_code) %>% slice(.,1) %>% ungroup()
+
+
+cnt_df <- data.frame('CNT','Number PheWAS Comorbidities', 56396)
+names(cnt_df) <- names(quant_pheno_description)
+cost_df <- data.frame('COST','Avg. Monthly Cost', 56396)
+names(cost_df) <- names(quant_pheno_description)
+
+
+
+quant_pheno_description <- quant_pheno_description %>% rbind(.,cnt_df) %>% rbind(.,cost_df)
+
+
+
+
+allphewas_quant_pheno <- allphewas_quant_pheno %>% merge(quant_pheno_description, ., by='phewas_code') %>% 
+  filter(total >= 2000)
+
+
+allphewas_quant_pheno <- allphewas_quant_pheno %>% 
+  mutate(rliabss=rss01) %>%
+  mutate(rliabos=ros01) %>%
+  mutate(MemberBirthYear=ageTest) %>%
+  mutate(MemberBirthYear_SE=ageTest_SE) %>%
+ mutate(phewas_description = Description) %>% 
+  select(-rss01,-ros01)
+
+
+allphewas_both <- allphewas_binary %>% bind_rows(.,allphewas_quant_pheno) %>%
+    select(-rss01,-ros01, -Description,-ageTest,-ageTest_SE)
+
+
+quant_traits_subset <- allphewas_quant_pheno %>% select(phewas_code) %>% unique()
+
+```
+
+
+## Create allphewas_both_zip
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+allphewas_binary_zipcode <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/twin_binary_zipcode.csv", 
+    " ", escape_double = FALSE, col_names = FALSE, 
+    trim_ws = TRUE)
+
+names(allphewas_binary_zipcode) <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/names_binary_zipcode.rds')
+
+
+allphewas_binary_zipcode <- allphewas_binary_zipcode %>%
+  mutate(h2_liab_SE_se = ifelse(phewas_code == '984',h2_SE,h2_liab_SE_se)) %>%
+  mutate(rliabss_SE_se = ifelse(phewas_code == '984',r_SS_SE,rliabss_SE_se)) %>%
+  mutate(c2_liab_SE_se = ifelse(phewas_code == '984',c2_SE,c2_liab_SE_se)) %>%
+    mutate(rliabos_SE_se = ifelse(phewas_code == '984',r_OS_SE,rliabos_SE_se)) 
+
+
+allphewas_binary_zipcode <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/twin_binary_zipcode.csv", 
+    " ", escape_double = FALSE, col_names = FALSE, 
+    trim_ws = TRUE)
+
+names(allphewas_binary_zipcode) <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/names_binary_zipcode.rds')
+
+
+allphewas_binary_zipcode <- allphewas_binary_zipcode %>%
+  mutate(h2_liab_SE_se = ifelse(phewas_code == '984',h2_SE,h2_liab_SE_se)) %>%
+  mutate(rliabss_SE_se = ifelse(phewas_code == '984',r_SS_SE,rliabss_SE_se)) %>%
+  mutate(c2_liab_SE_se = ifelse(phewas_code == '984',c2_SE,c2_liab_SE_se)) %>%
+    mutate(rliabos_SE_se = ifelse(phewas_code == '984',r_OS_SE,rliabos_SE_se)) 
+
+
+
+
+
+
+names(allphewas_binary_zipcode) <- sub("_se", "", names(allphewas_binary_zipcode))
+
+
+
+allphewas_binary_zipcode <- allphewas_binary_zipcode %>% inner_join(phewas, ., by='phewas_code') 
+
+
+
+
+
+
+
+allphewas_quant_zipcode <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/twin_quant_zipcode.csv", 
+    " ", escape_double = FALSE, col_names = FALSE, 
+    trim_ws = TRUE)
+
+
+
+
+names(allphewas_quant_zipcode) <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/names_quant_zipcode.rds')
+
+
+
+names(allphewas_quant_zipcode) <- sub("_se", "", names(allphewas_quant_zipcode))
+
+
+
+allphewas_quant_zipcode <- allphewas_quant_zipcode %>% merge(quant_pheno_description, ., by='phewas_code') 
+
+
+
+allphewas_quant_zipcode <- allphewas_quant_zipcode %>% inner_join(.,quant_traits_subset, by='phewas_code')
+
+
+
+allphewas_quant_zipcode <- allphewas_quant_zipcode %>% 
+  mutate(rliabss=rss01) %>%
+  mutate(rliabos=ros01) %>%
+  mutate(rliabincome_SE=rincome01_SE) %>%
+  mutate(rliabaqi_SE=raqi01_SE ) %>%
+    mutate(rliabtemp_SE=rtemp01_SE ) %>%
+  mutate(rliabtemp=rtemp01) %>%
+  mutate(rliabaqi=raqi01) %>%
+    mutate(MemberBirthYear=ageTest) %>%
+  mutate(MemberBirthYear_SE=ageTest_SE) %>%
+  mutate(rliabincome=rincome01) %>% mutate(phewas_description = Description) %>% 
+  select(-rss01,-ros01,-rincome01_SE,-raqi01_SE,-rtemp01_SE,-rtemp01,-raqi01,-rincome01, -Description, -ageTest,-ageTest_SE)
+
+
+allphewas_both_zipcode <- allphewas_binary_zipcode %>% bind_rows(.,allphewas_quant_zipcode) %>%
+    select(-rss01,-ros01,-rtemp01,-raqi01,-rincome01)
+
+
+
+```
+
+
+
+##FDR Correction
+```{r}
+
+  allphewas_both <- allphewas_both %>%
+  mutate(h2_liab.zscore=h2_liab/h2_liab_SE) %>%
+                  mutate(c2_liab.zscore=c2_liab/c2_liab_SE) %>%
+                  mutate(h2_liab.pvalue=2*pnorm(-abs(h2_liab.zscore))) %>%
+                  mutate(c2_liab.pvalue=2*pnorm(-abs(c2_liab.zscore))) %>%
+                  mutate(pvalue_h2_FDR = p.adjust(.$h2_liab.pvalue, method='BY')) %>%
+                  mutate(pvalue_c2_FDR = p.adjust(.$c2_liab.pvalue, method='BY')) %>%
+                    mutate(pvalue_h2_bonferroni = p.adjust(.$h2_liab.pvalue, method='bonferroni')) %>%
+                  mutate(pvalue_c2_bonferroni = p.adjust(.$c2_liab.pvalue, method='bonferroni')) %>%
+                  mutate(observed_h2 = -log10(h2_liab.pvalue) ) %>%
+                  mutate(observed_c2 = -log10(c2_liab.pvalue) ) %>%
+                  mutate(rliabss_liab.zscore=rliabss/rliabss_SE) %>%
+                  mutate(rliabos_liab.zscore=rliabos/rliabos_SE) %>%
+                  mutate(rliabss_liab.pvalue=2*pnorm(-abs(rliabss_liab.zscore))) %>%
+                  mutate(rliabos_liab.pvalue=2*pnorm(-abs(rliabos_liab.zscore))) %>%
+                  mutate(observed_rliabss = -log10(rliabss_liab.pvalue) ) %>%
+                  mutate(observed_rliabos = -log10(rliabos_liab.pvalue) ) %>%
+    mutate(tot_e2=h2_liab+c2_liab) %>%
+  mutate(tot_e2_SE=sqrt(h2_liab_SE^2+c2_liab_SE^2)) %>%
+  mutate(tot_e2.zscore=tot_e2/tot_e2_SE) %>%
+  mutate(tot_e2.pvalue=2*pnorm(-abs(tot_e2.zscore))) %>%
+  mutate(tot_e2.pvalue_FDR = p.adjust(tot_e2.pvalue, method='BY')) %>%
+  mutate(observed_tot_e2 = -log10(tot_e2.pvalue) ) %>%
+    mutate(e2=1-h2_liab-c2_liab) %>%
+  mutate(e2_SE=sqrt(h2_liab_SE^2 + c2_liab_SE^2)) %>%
+  mutate(e2.zscore=e2/e2_SE) %>%
+  mutate(e2.pvalue=2*pnorm(-abs(e2.zscore))) %>%
+  mutate(e2.pvalue_FDR = p.adjust(e2.pvalue, method='BY')) %>%
+  mutate(observed_e2 = -log10(e2.pvalue) )
+
+
+
+  allphewas_both_zipcode <- allphewas_both_zipcode %>%
+  mutate(h2_liab.zscore=h2_liab/h2_liab_SE) %>%
+                  mutate(c2_liab.zscore=c2_liab/c2_liab_SE) %>%
+                  mutate(h2_liab.pvalue=2*pnorm(-abs(h2_liab.zscore))) %>%
+                  mutate(c2_liab.pvalue=2*pnorm(-abs(c2_liab.zscore))) %>%
+                  mutate(pvalue_h2_FDR = p.adjust(.$h2_liab.pvalue, method='BY')) %>%
+                  mutate(pvalue_c2_FDR = p.adjust(.$c2_liab.pvalue, method='BY')) %>%
+                  mutate(observed_h2 = -log10(h2_liab.pvalue) ) %>%
+                  mutate(observed_c2 = -log10(c2_liab.pvalue) ) %>%
+                  mutate(rliabss_liab.zscore=rliabss/rliabss_SE) %>%
+                  mutate(rliabos_liab.zscore=rliabos/rliabos_SE) %>%
+                  mutate(rliabss_liab.pvalue=2*pnorm(-abs(rliabss_liab.zscore))) %>%
+                  mutate(rliabos_liab.pvalue=2*pnorm(-abs(rliabos_liab.zscore))) %>%
+                  mutate(observed_rliabss = -log10(rliabss_liab.pvalue) ) %>%
+                  mutate(observed_rliabos = -log10(rliabos_liab.pvalue) ) %>%
+    mutate(tot_e2=h2_liab+c2_liab) %>%
+  mutate(tot_e2_SE=sqrt(h2_liab_SE^2+c2_liab_SE^2)) %>%
+  mutate(tot_e2.zscore=tot_e2/tot_e2_SE) %>%
+  mutate(tot_e2.pvalue=2*pnorm(-abs(tot_e2.zscore))) %>%
+  mutate(tot_e2.pvalue_FDR = p.adjust(tot_e2.pvalue, method='BY')) %>%
+  mutate(observed_tot_e2 = -log10(tot_e2.pvalue) ) %>%
+    mutate(e2=1-h2_liab-c2_liab-rliabincome-rliabtemp-rliabaqi) %>%
+  mutate(e2_SE=sqrt(h2_liab_SE^2+c2_liab_SE^2 + rliabincome_SE^2 + rliabaqi_SE^2 + rliabtemp_SE^2  )) %>%
+  mutate(e2.zscore=e2/e2_SE) %>%
+  mutate(e2.pvalue=2*pnorm(-abs(e2.zscore))) %>%
+  mutate(e2.pvalue_FDR = p.adjust(e2.pvalue, method='BY')) %>%
+  mutate(observed_e2 = -log10(e2.pvalue) ) %>%
+                      mutate(rliabincome.zscore=rliabincome/rliabincome_SE) %>%
+                  mutate(rliabincome.pvalue=2*pnorm(-abs(rliabincome.zscore))) %>%
+                  mutate(rliabincome.pvalue_FDR = p.adjust(rliabincome.pvalue, method='BY')) %>%
+                  mutate(observed_rliabincome = -log10(rliabincome.pvalue) ) %>%
+mutate(rliabaqi.zscore=rliabaqi/rliabaqi_SE) %>%
+  mutate(rliabaqi.pvalue=2*pnorm(-abs(rliabaqi.zscore))) %>%
+  mutate(rliabaqi.pvalue_FDR = p.adjust(rliabaqi.pvalue, method='BY')) %>%
+  mutate(observed_rliabaqi = -log10(rliabaqi.pvalue) ) %>%
+mutate(rliabtemp.zscore=rliabtemp/rliabtemp_SE) %>%
+  mutate(rliabtemp.pvalue=2*pnorm(-abs(rliabtemp.zscore))) %>%
+  mutate(rliabtemp.pvalue_FDR = p.adjust(rliabtemp.pvalue, method='BY')) %>%
+  mutate(observed_rliabtemp = -log10(rliabtemp.pvalue) ) 
+
+  
+  
+  rm(cnt_df, cost_df, allphewas_binary, allphewas_binary_zipcode,allphewas_quant_pheno, allphewas_quant_zipcode, phewas)
+
+```
+
+
+
+## Short Names
+
+```{r}
+allphewas_both <- allphewas_both %>% mutate(shortName=phewas_description) %>%
+    mutate(shortName=ifelse(phewas_code =='313.1','ADHD',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='134577','LDL Cholesterol',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='706.1','Acne',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='495','Asthma',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='637','Low Birthweight',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='464','Acute Sinusitis',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='984','Lead Poisoning',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='871.1','Hand Wound',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='871.3','Foot Wound',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='800.3','Tibia/Fibula Fracture',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='726.3','Bursitis',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='696.4','Psoriasis',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='696.4','Psoriasis',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='7187','Hemoglobin',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='362.1','Retinopathy',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='313','Pervasive Development Disorder',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='313.1','ADHD',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='COST','Cost',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='CNT','Comorbids',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='984','Lead Poisoning',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='367','Low Vision',shortName)) %>%
+      mutate(shortName = ifelse(phewas_code =='769','Nonallopathic Lesion',shortName)) %>%
+        mutate(shortName = ifelse(phewas_code =='465','Respiratory Infections',shortName)) %>%
+      mutate(shortName = ifelse(phewas_code =='870','Head Wound',shortName)) %>%
+      mutate(shortName = ifelse(phewas_code =='381','Otitis Media',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='474.2','Chronic Tonsillitis',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='524','Dentofacial Anomalies',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='930','Food Allergy',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='939','Atopic/Contact Dermatitis',shortName)) %>%
+mutate(shortName = ifelse(phewas_code =='706','Sebaceous Gland',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='726','Peripheral Enthesopathies',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='859','Complication Due to Implant',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='343','Cerebral Palsy',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='316','Substance Addiction',shortName)) %>%
+      mutate(shortName = ifelse(phewas_code =='555','Inflammatory Bowel Disease',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='345','Epilepsy, recurrent seizures',shortName)) %>%
+      mutate(shortName = ifelse(phewas_code =='758','Chromosomal anomalies/genetic disorders',shortName)) %>%
+mutate(shortName = ifelse(phewas_code =='747','Cardiac/circulatory congenital anomalies',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='656.2','Respiratory Condition Newborn',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='656','Perinatal Condition Newborn',shortName)) 
+
+
+
+
+
+
+    
+    
+    
+    
+    
+    
+    
+    
+allphewas_both_zipcode <- allphewas_both_zipcode %>% mutate(shortName=phewas_description) %>%
+    mutate(shortName=ifelse(phewas_code =='313.1','ADHD',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='134577','LDL Cholesterol',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='706.1','Acne',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='495','Asthma',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='637','Low Birthweight',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='464','Acute Sinusitis',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='984','Lead Poisoning',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='871.1','Hand Wound',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='871.3','Foot Wound',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='800.3','Tibia/Fibula Fracture',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='726.3','Bursitis',shortName)) %>%
+  mutate(shortName=ifelse(phewas_code =='696.4','Psoriasis',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='696.4','Psoriasis',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='7187','Hemoglobin',shortName)) %>%
+    mutate(shortName=ifelse(phewas_code =='362.1','Retinopathy',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='313','Pervasive Development Disorder',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='313.1','ADHD',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='COST','Cost',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='CNT','Comorbids',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='984','Lead Poisoning',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='367','Low Vision',shortName)) %>%
+      mutate(shortName = ifelse(phewas_code =='769','Nonallopathic Lesion',shortName)) %>%
+        mutate(shortName = ifelse(phewas_code =='465','Respiratory Infections',shortName)) %>%
+      mutate(shortName = ifelse(phewas_code =='870','Head Wound',shortName)) %>%
+      mutate(shortName = ifelse(phewas_code =='381','Otitis Media',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='474.2','Chronic Tonsillitis',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='524','Dentofacial Anomalies',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='930','Food Allergy',shortName)) %>%
+    mutate(shortName = ifelse(phewas_code =='939','Atopic/Contact Dermatitis',shortName)) %>%
+mutate(shortName = ifelse(phewas_code =='706','Sebaceous Gland',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='726','Peripheral Enthesopathies',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='859','Complication Due to Implant',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='345','Epilepsy/recurrent seizures',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='758','Chromosomal anomalies/genetic disorders',shortName)) %>%
+mutate(shortName = ifelse(phewas_code =='747','Cardiac/circulatory congenital anomalies',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='656.2','Respiratory Condition Newborn',shortName)) %>%
+  mutate(shortName = ifelse(phewas_code =='656','Perinatal Condition Newborn',shortName)) 
+
+    
+    
+```
+
+## Functional Domain Data frames
+```{r}
+
+
+
+phewas_functional_domain_map_quant_trait <- quant_traits_subset %>% 
+  inner_join(.,quant_pheno_description, by='phewas_code') %>%
+  select(phewas_code, phewas_description=Description) %>% 
+mutate(functional_domain = case_when(phewas_code == 'CNT' ~ 'PheWAS Comorbids',
+                                     phewas_code == 'COST' ~ 'Avg. Monthly Cost',
+                                     TRUE ~ 'Quantitative'))
+
+
+phewas_functional_domain_map <- phewas_functional_domain_map %>% bind_rows(.,phewas_functional_domain_map_quant_trait)
+
+
+phewas_functional_domain_map_all <- phewas_functional_domain_map %>% 
+  select(phewas_code, phewas_description) %>% mutate(functional_domain = 'All Traits') %>% unique()
+
+phewas_functional_domain_map <- phewas_functional_domain_map %>% bind_rows(.,phewas_functional_domain_map_all)
+
+
+
+allphewas_both_functional_domain <- allphewas_both %>% 
+  inner_join(.,phewas_functional_domain_map, by=c('phewas_code', 'phewas_description'))
+
+
+allphewas_both_zipcode_functional_domain <- allphewas_both_zipcode %>% 
+  inner_join(.,phewas_functional_domain_map, by=c('phewas_code', 'phewas_description'))
+
+
+rm(phewas_functional_domain_map_quant_trait,phewas_functional_domain_map_all)
+
+
+
+
+```
+
+
+
+```{r, echo=FALSE, message=FALSE}
+round_df <- function(df, digits) {
+  nums <- vapply(df, is.numeric, FUN.VALUE = logical(1))
+
+  df[,nums] <- round(df[,nums], digits = digits)
+
+  (df)
+}
+
+
+```
+
+
+
+
+
+
+# Data Summary
+
+## Number of Twin Pairs
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+DT::datatable(demographic_information %>% tally())
+```
+
+## Total Number of Phenotypes
+```{r}
+
+totalPheno <- nrow(allphewas_both)
+
+totalPheno
+
+
+```
+
+
+
+## Number of Twin Pairs by Pair Type
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+DT::datatable(demographic_information %>% group_by(genderPairType) %>% tally())
+
+```
+
+
+
+## SE for p(mz|ss)
+```{r}
+
+countTwin <- demographic_information %>% group_by(genderPairType) %>% tally() %>%  spread(.,genderPairType, n) %>%
+  mutate(type = 'binary') %>% mutate(binYOB = 'All')
+
+
+countTwin_birth <- demographic_information %>% 
+  mutate(binYOB = cut(yearT1, breaks=c(1985,1996,2006,2016), dig.lab=4, include.lowest=TRUE, right=FALSE ) ) %>% group_by(binYOB,genderPairType) %>% tally() %>% spread(.,genderPairType, n) %>% ungroup()
+
+
+countTwin_birth <- countTwin_birth %>% mutate(type='binary')
+
+
+countTwin_all <- countTwin %>% bind_rows(.,countTwin_birth)
+
+
+countTwin_all <- countTwin_all %>% mutate(SS=FF+MM) %>% mutate(OS = MF)
+
+
+
+YearOfBirth <- readRDS('~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/quant_raw_data/revised/quant_pheno_YearOfBirthCount.rds')
+
+
+
+
+count_quant_binYOB <- YearOfBirth %>% filter(phewas_code == '7187') %>% filter(cohort == 'subset') %>% mutate(binYOB = cut(yearBirth, breaks=c(1985,1996,2006,2016),include.lowest = TRUE,dig.lab=4, right=FALSE)) %>% 
+  group_by(binYOB, genderConfig, cohort) %>% summarise(n=sum(numPairs)) %>%ungroup()  %>% select(-cohort) %>% spread(.,genderConfig,n) %>% mutate(type = 'quant')
+
+
+
+count_quant_all <- YearOfBirth %>% filter(phewas_code == '7187') %>% filter(cohort == 'subset') %>% 
+  group_by(genderConfig, cohort) %>% summarise(n=sum(numPairs)) %>%ungroup()  %>% select(-cohort) %>% spread(.,genderConfig,n) %>% mutate(type = 'quant') %>% mutate(binYOB = 'All')
+
+
+
+count_everything <- countTwin_all %>% 
+  bind_rows(.,count_quant_all,count_quant_binYOB) %>% 
+  select(-MM,-MF,-FF) %>% mutate(n=SS+OS ) %>% 
+  mutate(pss=SS/n,pmz=1-2*(OS/n)) %>% 
+  mutate(p=pmz/pss) %>%
+  mutate(var_p = (n*OS)/(SS^3)) %>% mutate(p_SE = sqrt(var_p)) %>%
+  mutate(p_low = p-1.96*p_SE, p_high = p+1.96*p_SE) %>% select(-pss,-pmz,-var_p)
+
+
+count_everything <- round_df(count_everything,3)
+
+DT::datatable(count_everything)
+
+
+```
+
+
+
+## Median Number of ICD codes
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+s1 <- demographic_information %>% select(genderPairType,nIcdT1) %>% mutate(nIcd = nIcdT1) %>% select(-nIcdT1)
+
+d1 <- demographic_information %>% select(genderPairType,nIcdT2) %>% mutate(nIcd = nIcdT2) %>% select(-nIcdT2)
+
+both_s1_d1 <- s1 %>% rbind(., d1)
+
+both_s1_d1 %>% summarise(median = median(nIcd, na.rm = TRUE), IQ25 = quantile(nIcd, .25), IQ75 = quantile(nIcd,.75))
+
+both_s1_d1 %>% group_by(genderPairType) %>% summarise(median = median(nIcd, na.rm = TRUE), IQ25 = quantile(nIcd, .25), IQ75 = quantile(nIcd,.75))
+
+
+rm(s1,d1,both_s1_d1_all)
+
+
+```
+
+
+
+
+
+## Median Number of Age Start year codes
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+s1 <- demographic_information %>% select(genderPairType,ageStartYear=ageStartYearT1, Gender = GenderT1) 
+
+d1 <- demographic_information %>% select(genderPairType,ageStartYear=ageStartYearT2, Gender=GenderT2) 
+
+both_s1_d1 <- s1 %>% rbind(., d1) 
+
+both_s1_d1_all <- both_s1_d1 %>% mutate(Gender='All')
+
+
+both_s1_d1 <- both_s1_d1 %>% bind_rows(.,both_s1_d1_all)
+
+both_s1_d1 %>% summarise(median = median(ageStartYear, na.rm = TRUE), IQ25 = quantile(ageStartYear, .25), IQ75 = quantile(ageStartYear,.75))
+
+both_s1_d1 %>% group_by(genderPairType) %>% summarise(median = median(ageStartYear, na.rm = TRUE), IQ25 = quantile(ageStartYear, .25), IQ75 = quantile(ageStartYear,.75))
+
+rm(s1,d1,both_s1_d1_all)
+
+ggplot_violin_age <- ggplot(both_s1_d1, aes(Gender, ageStartYear)) + 
+  geom_violin(aes(fill = Gender)) +
+  theme_fivethirtyeight() +
+  scale_color_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) )  + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
+  theme(axis.title = element_text()) + ylab('Age at Start of Surveillance') + xlab('Gender Category') +
+  theme(legend.position="none")
+  
+
+
+ggplot_violin_age
+
+
+
+
+```
+
+
+
+
+## Median Number of Month Enrollment
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+s1 <- demographic_information %>% select(genderPairType,monthEnrollment=monthEnrollmentT1, Gender= GenderT1) 
+
+d1 <- demographic_information %>% select(genderPairType,monthEnrollment=monthEnrollmentT2, Gender=GenderT2) 
+
+both_s1_d1 <- s1 %>% rbind(., d1)
+
+both_s1_d1_all <- both_s1_d1 %>% mutate(Gender = 'All')
+
+both_s1_d1 <- both_s1_d1 %>% bind_rows(.,both_s1_d1_all)
+
+both_s1_d1 %>% summarise(median = median(monthEnrollment, na.rm = TRUE), IQ25 = quantile(monthEnrollment, .25), IQ75 = quantile(monthEnrollment,.75))
+
+both_s1_d1 %>% group_by(genderPairType) %>% summarise(median = median(monthEnrollment, na.rm = TRUE), IQ25 = quantile(monthEnrollment, .25), IQ75 = quantile(monthEnrollment,.75))
+
+rm(s1,d1,both_s1_d1_all)
+
+ggplot_violin_enrollment <- ggplot(both_s1_d1, aes(Gender, monthEnrollment)) + 
+  geom_violin(aes(fill = Gender)) +
+  theme_fivethirtyeight() +
+  scale_color_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) )  + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
+  theme(axis.title = element_text()) + ylab('Months of Surveillance') + xlab('Gender Category') 
+
+ggplot_violin_enrollment
+
+
+
+
+
+```
+
+
+
+
+
+## Distinct Zipcodes
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+s1 <- demographic_information %>% select(genderPairType,ZipCodeT1) %>% mutate(ZipCode = ZipCodeT1) %>% filter(ZipCode != 'U') %>% select(-ZipCodeT1)
+
+
+
+
+
+s1 %>% summarise(Unique_Elements = n_distinct(ZipCode)) 
+
+
+s1 %>% group_by(genderPairType) %>% summarise(Unique_Elements = n_distinct(ZipCode)) 
+
+rm(s1, both_s1_d1_all, countTwin, countTwin_birth, count_quant_binYOB, count_quant_all, both_s1_d1, count_everything,countTwin_all)
+
+```
+
+
+## Prevalence Counts
+```{r}
+prevalence_aggregate <- readRDS(file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/prevalence_data/prevalence_aggregate.rds')
+
+
+phewas_functional_domain_map_binary_no_all <- phewas_functional_domain_map %>% 
+  filter(functional_domain !='Quantitative') %>%
+filter(functional_domain !='Avg. Monthly Cost') %>%
+filter(functional_domain !='PheWAS Comorbids') %>%
+  filter(functional_domain !='All Traits') 
+
+
+
+prev_all <- prevalence_aggregate %>% 
+            group_by(phewas_code, PheWAS_Indicator) %>% 
+            summarise(n=sum(countTwin)) %>%
+            spread(PheWAS_Indicator, n, fill=0) %>%
+            mutate(prevalence = `1` / (`0` + `1`) ) %>%
+            right_join(., phewas_functional_domain_map_binary_no_all, by='phewas_code') %>%
+            mutate(category = 'All')
+
+
+
+prev_M <- prevalence_aggregate %>% 
+            group_by(phewas_code, PheWAS_Indicator, Gender) %>% 
+            summarise(n=sum(countTwin)) %>%
+            filter(Gender == 'M') %>% select(-Gender) %>%
+            spread(PheWAS_Indicator, n, fill=0) %>%
+            mutate(prevalence = `1` / (`0` + `1`) ) %>%
+            right_join(., phewas_functional_domain_map_binary_no_all, by='phewas_code') %>%
+            mutate(category = 'Male')
+
+
+
+prev_F <- prevalence_aggregate %>% 
+            group_by(phewas_code, PheWAS_Indicator, Gender) %>% 
+            summarise(n=sum(countTwin)) %>%
+            filter(Gender == 'F') %>% select(-Gender) %>%
+            spread(PheWAS_Indicator, n, fill=0) %>%
+            mutate(prevalence = `1` / (`0` + `1`) ) %>%
+            right_join(., phewas_functional_domain_map_binary_no_all, by='phewas_code') %>%
+            mutate(category = 'Female')
+
+
+prev <- prev_all %>% rbind(.,prev_M) %>% rbind(., prev_F) %>% filter(!is.na(functional_domain ))
+
+
+rm(prev_all, prev_F, prev_M)
+
+
+
+functional_domain_summary_all <- prev %>% select(phewas_code,prevalence, category) %>% unique() %>% group_by(category) %>%summarise(median = median(prevalence, na.rm = TRUE), IQ25 = quantile(prevalence, .25), IQ75 = quantile(prevalence,.75), numTraits = n_distinct(phewas_code)) 
+
+
+functional_domain_summary_all$functional_domain <- 'All'
+
+functional_domain_summary <- prev %>% group_by(functional_domain, category) %>% summarise(median = median(prevalence, na.rm = TRUE), IQ25 = quantile(prevalence, .25), IQ75 = quantile(prevalence,.75), numTraits = n_distinct(phewas_code))
+
+functional_domain_summary <- functional_domain_summary %>% bind_rows(.,functional_domain_summary_all)
+
+DT::datatable(functional_domain_summary) %>% 
+  formatSignif('median',2) %>% 
+  formatSignif('IQ25',2) %>% 
+  formatSignif('IQ75',2)
+
+DT::datatable(functional_domain_summary %>% select(functional_domain) %>% unique())
+
+
+DT::datatable(prev)
+
+
+```
+
+
+
+## Boxplots of Prevalence by Functional Category
+```{r fig,message=FALSE}
+plot_fig <- ggplot(prev, aes(functional_domain, prevalence)) +
+  geom_boxplot(aes(colour=category), outlier.alpha = 0.4) + 
+   scale_y_log10() +
+  scale_color_fivethirtyeight() +
+  theme_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) ) +
+  theme(axis.title = element_text()) + ylab('Prevalence') + xlab('Functional Domain') 
+
+
+
+
+ggsave(plot_fig, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/prevalence_functional_category.png', height=3.5, width=6)
+
+plot_fig
+```
+
+
+
+
+
+
+
+
+
+
+# Meta-Analysis
+
+## Setup
+```{r}
+all_traits_df <- data.frame(functional_domain = 'All Traits', 
+                            r_MZ = 0.636, 
+                            r_MZ_SE = 0.002, 
+                            r_DZ=0.339,
+                            r_DZ_SE = 0.003,
+                            h2 = 0.488,
+                            h2_SE = 0.005,
+                            c2 = 0.174,
+                            c2_SE = 0.004,
+                            h2_corr = 0.593,
+                            h2_corr_SE = 0.008,
+                            c2_corr = 0.042,
+                            c2_corr_SE = 0.007,
+                            r_MZ_nstudies = NA ,
+                            r_MZ_ntraits = 9568,
+                            r_DZ_nstudies = NA,
+                            r_DZ_ntraits = 5220,
+                            h2_nstudies = NA,
+                            h2_ntraits = 2929,
+                            c2_nstudies = NA,
+                            c2_ntraits = 2771)
+
+
+
+functional_domain_df <- readRDS(file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/match_phewas_mapping/functional_domain/functional_domain.rds')
+
+
+functional_domain_df <- functional_domain_df %>% rbind(.,all_traits_df)
+
+
+functional_domain_df <-   functional_domain_df %>% 
+  filter(functional_domain != 'Socialinteractions') %>%
+  filter(functional_domain != 'Socialvalues') %>%
+  filter(functional_domain != 'Cell') %>%
+  filter(functional_domain != 'Activities') %>%
+  filter(functional_domain != 'Nutritional') %>%
+  filter(functional_domain != 'Mortality') %>%
+filter(functional_domain != 'Muscular')
+
+
+
+```
+
+
+## h2 meta-analysis
+```{r}
+zz <- allphewas_both_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=h2_liab,sei=h2_liab_SE,data=., method='DL'))
+
+
+phewas_b_h2 <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, h2_liab,1:ncol(.))
+
+phewas_se_h2 <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, h2_liab_SE,1:ncol(.))
+
+phewas_meta_h2_liab_all <- phewas_b_h2 %>% inner_join(.,phewas_se_h2, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(phewas_meta_h2_liab_all) <- c('functional_domain','h2','h2_SE', 'category')
+
+
+
+
+MaTCH_h2 <- functional_domain_df %>% select(functional_domain, h2_corr, h2_corr_SE) %>% mutate(category = 'MaTCH')
+
+names(MaTCH_h2) <- c('functional_domain','h2','h2_SE', 'category')
+
+
+metaAll_justMatch_h2 <- phewas_meta_h2_liab_all %>% rbind(.,MaTCH_h2) 
+
+
+rm(zz, phewas_b_h2, phewas_se_h2, MaTCH_h2)
+
+
+```
+
+
+## c2 meta-analysis
+```{r}
+zz <- allphewas_both_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=c2_liab,sei=c2_liab_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, c2_liab,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, c2_liab_SE,1:ncol(.))
+
+phewas_meta_c2_liab_all <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(phewas_meta_c2_liab_all) <- c('functional_domain','c2','c2_SE', 'category')
+
+
+
+
+MaTCH <- functional_domain_df %>% select(functional_domain, c2_corr, c2_corr_SE) %>% mutate(category = 'MaTCH')
+
+names(MaTCH) <- c('functional_domain','c2','c2_SE', 'category')
+
+
+metaAll_justMatch_c2 <- phewas_meta_c2_liab_all %>% rbind(.,MaTCH) 
+
+
+rm(zz, phewas_b, phewas_se, MaTCH)
+
+
+```
+
+
+## e2 meta-analysis
+```{r}
+zz <- allphewas_both_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=e2,sei=e2_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, e2,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, e2_SE,1:ncol(.))
+
+phewas_meta_e2_liab_all <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(phewas_meta_e2_liab_all) <- c('functional_domain','e2','e2_SE', 'category')
+
+
+
+
+
+
+rm(zz, phewas_b, phewas_se)
+
+
+```
+
+
+## rss meta-analysis
+
+```{r}
+zz <- allphewas_both_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=rliabss,sei=rliabss_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, rliabss,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, rliabss_SE,1:ncol(.))
+
+phewas_meta_rss_liab_all <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(phewas_meta_rss_liab_all) <- c('functional_domain','rSS','rSS_SE', 'category')
+
+
+```
+
+
+
+
+## ros meta-analysis
+
+```{r}
+zz <- allphewas_both_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% filter(rliabos_SE > .00000001) %>%
+  split(.$functional_domain) %>% map(~rma(yi=rliabos,sei=rliabos_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, rliabos,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, rliabos_SE,1:ncol(.))
+
+phewas_meta_ros_liab_all <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(phewas_meta_ros_liab_all) <- c('functional_domain','rOS','rOS_SE', 'category')
+
+
+```
+
+
+
+## h2/c2 MaTCH Plot
+```{r}
+
+
+
+
+
+metaAll_justMatch_h2$functional_domain <- factor(metaAll_justMatch_h2$functional_domain, 
+                                                 levels = c('All Traits',
+                                                            'Aging',
+                                                            'Cardiovascular',
+                                                            'Cognitive',
+                                                            'Connective tissue',
+                                                            'Dermatological',
+                                                            'Developmental',
+                                                            'Ear,Nose,Throat',
+                                                            'Endocrine',
+                                                            'Environment',
+                                                            'Gastrointestinal',
+                                                            'Hematological',
+                                                            'Immunological',
+                                                            'Infection',
+                                                            'Metabolic',
+                                                            'Neoplasms',
+                                                            'Neurological',
+                                                            'Ophthalmological',
+                                                            'Psychiatric',
+                                                            'Reproduction',
+                                                            'Respiratory',
+                                                            'Skeletal',
+                                                            'Quantitative',
+                                                            'Avg. Monthly Cost',
+                                                            'PheWAS Comorbids'))
+
+
+
+metaAll_justMatch_c2$functional_domain <- factor(metaAll_justMatch_c2$functional_domain, 
+                                                 levels = c('All Traits',
+                                                            'Aging',
+                                                            'Cardiovascular',
+                                                            'Cognitive',
+                                                            'Connective tissue',
+                                                            'Dermatological',
+                                                            'Developmental',
+                                                            'Ear,Nose,Throat',
+                                                            'Endocrine',
+                                                            'Environment',
+                                                            'Gastrointestinal',
+                                                            'Hematological',
+                                                            'Immunological',
+                                                            'Infection',
+                                                            'Metabolic',
+                                                            'Neoplasms',
+                                                            'Neurological',
+                                                            'Ophthalmological',
+                                                            'Psychiatric',
+                                                            'Reproduction',
+                                                            'Respiratory',
+                                                            'Skeletal',
+                                                            'Quantitative',
+                                                            'Avg. Monthly Cost',
+                                                            'PheWAS Comorbids'))
+
+
+
+
+
+
+h2_liab_ggplot <- ggplot(metaAll_justMatch_h2, aes(y=h2, x=functional_domain, colour=category)) + 
+  geom_point(position = position_dodge(width = .5)) +  
+  geom_errorbar(aes(ymin=h2-1.96*h2_SE, ymax=h2+1.96*h2_SE),position = position_dodge(width = 0.5)) + 
+  coord_flip() +  
+    theme_fivethirtyeight() +
+
+  scale_color_fivethirtyeight() +
+  theme(axis.text=element_text(size=8))  + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
+  theme(axis.title = element_text()) + ylab('Heritability (h2)') + xlab('Functional Domain')
+
+
+ggsave(h2_liab_ggplot,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/h2_liab_comparison_match.png', height=3.5, width=6)
+
+
+c2_liab_ggplot <- ggplot(metaAll_justMatch_c2, aes(y=c2, x=functional_domain, colour=category)) + 
+  geom_point(position = position_dodge(width = .5)) +  
+  geom_errorbar(aes(ymin=c2-1.96*c2_SE, ymax=c2+1.96*c2_SE),position = position_dodge(width = 0.5)) + 
+  coord_flip() +     
+  scale_color_fivethirtyeight() +
+  theme_fivethirtyeight() +
+  theme(axis.text=element_text(size=8))  + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
+  theme(axis.title = element_text()) + ylab('Shared Environmental Variance (c2)') + xlab('Functional Domain')
+
+
+
+ggsave(c2_liab_ggplot,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/c2_liab_comparison_match.png', height=3.5, width=6)
+
+
+
+h2_c2_MaTCH <- ggarrange(h2_liab_ggplot,c2_liab_ggplot,labels = c( "a)", 'b)'), nrow = 2, ncol = 1, common.legend=TRUE,legend='bottom' )
+
+h2_c2_MaTCH
+
+ggsave(h2_c2_MaTCH,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/h2_c2_MaTCH.png', height = 10, width=8)
+
+
+```
+
+
+## Barplot by functional group
+```{r}
+
+phewas_meta_h2_liab_all$stat <- 'h2'
+phewas_meta_c2_liab_all$stat <- 'c2'
+#phewas_meta_e2_liab_all$stat <- 'e2'
+phewas_meta_rss_liab_all$stat <- 'rOS'
+phewas_meta_ros_liab_all$stat <- 'rSS'
+
+a <- phewas_meta_h2_liab_all %>% select(functional_domain, statistic = h2, stat)
+b <- phewas_meta_c2_liab_all %>% select(functional_domain, statistic = c2, stat)
+#c <- phewas_meta_e2_liab_all %>% select(functional_domain, statistic = e2, stat)
+d <- phewas_meta_ros_liab_all %>% select(functional_domain, statistic = rOS, stat)
+e <- phewas_meta_rss_liab_all %>% select(functional_domain, statistic = rSS, stat)
+
+z_meta_all <- a %>% bind_rows(.,b,d,e)
+
+rm(a,b,d,e)
+
+z_meta_all$stat <- factor(z_meta_all$stat, levels=c('rOS','rSS', 'h2','c2'))
+
+
+z_meta_all$functional_domain <- factor(z_meta_all$functional_domain, 
+                                                 levels = c('All Traits',
+                                                            'Aging',
+                                                            'Cardiovascular',
+                                                            'Cognitive',
+                                                            'Connective tissue',
+                                                            'Dermatological',
+                                                            'Developmental',
+                                                            'Ear,Nose,Throat',
+                                                            'Endocrine',
+                                                            'Environment',
+                                                            'Gastrointestinal',
+                                                            'Hematological',
+                                                            'Immunological',
+                                                            'Infection',
+                                                            'Metabolic',
+                                                            'Neoplasms',
+                                                            'Neurological',
+                                                            'Ophthalmological',
+                                                            'Psychiatric',
+                                                            'Reproduction',
+                                                            'Respiratory',
+                                                            'Skeletal',
+                                                            'Quantitative',
+                                                            'Avg. Monthly Cost',
+                                                            'PheWAS Comorbids'))
+
+
+
+barchart_fn_domain <- ggplot(z_meta_all, aes(functional_domain, statistic, fill=stat)) + 
+  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black") +
+  theme_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) ) +
+    theme(axis.title = element_text()) +
+ylab('Statistic Value') + xlab('Functional Domain') + labs(fill='Statistic') 
+
+barchart_fn_domain
+
+ggsave(barchart_fn_domain, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/barchart_fn_domain.png')
+
+
+
+```
+
+
+
+
+
+
+## Barchart with environmental information
+
+### meta-analysis h2 with environmental variables
+
+```{r}
+
+zz <- allphewas_both_zipcode_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=h2_liab,sei=h2_liab_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, h2_liab,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, h2_liab_SE,1:ncol(.))
+
+environment_meta_h2_liab_all_environment <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(environment_meta_h2_liab_all_environment) <- c('functional_domain','h2','h2_SE', 'category')
+
+
+environment_meta_h2_liab_all_environment <- environment_meta_h2_liab_all_environment %>% 
+  mutate(h2_low=h2-1.96*h2_SE,h2_high=h2+1.96*h2_SE )
+
+
+DT::datatable(round_df(environment_meta_h2_liab_all_environment, digits=3))
+
+
+rm(zz,phewas_b, phewas_se)
+
+
+```
+
+
+
+### meta-analysis c2 with environmental variables
+
+```{r}
+
+zz <- allphewas_both_zipcode_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=c2_liab,sei=c2_liab_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, c2_liab,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, c2_liab_SE,1:ncol(.))
+
+environment_meta_c2_liab_all_environment <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(environment_meta_c2_liab_all_environment) <- c('functional_domain','c2','c2_SE', 'category')
+
+environment_meta_c2_liab_all_environment <- environment_meta_c2_liab_all_environment %>% mutate(c2_low=c2-1.96*c2_SE,c2_high=c2+1.96*c2_SE )
+
+DT::datatable(round_df(environment_meta_c2_liab_all_environment, digits=3))
+
+
+rm(zz,phewas_b, phewas_se)
+
+
+```
+
+
+
+
+### meta-analysis e2 with environmental variables
+
+```{r}
+
+zz <- allphewas_both_zipcode_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=e2,sei=e2_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, e2,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, e2_SE,1:ncol(.))
+
+environment_meta_e2_liab_all_environment <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(environment_meta_e2_liab_all_environment) <- c('functional_domain','e2','e2_SE', 'category')
+
+
+environment_meta_e2_liab_all_environment <- environment_meta_e2_liab_all_environment %>% 
+  mutate(e2_low=e2-1.96*e2_SE,e2_high=e2+1.96*e2_SE )
+
+
+DT::datatable(round_df(environment_meta_e2_liab_all_environment, digits=3))
+
+
+rm(zz,phewas_b, phewas_se)
+
+
+```
+
+
+
+### meta-analysis rliabincome with environmental variables
+
+```{r}
+
+zz <- allphewas_both_zipcode_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=rliabincome,sei=rliabincome_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, rliabincome,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, rliabincome_SE,1:ncol(.))
+
+environment_meta_rliabincome_all_environment <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(environment_meta_rliabincome_all_environment) <- c('functional_domain','var_income','var_income_SE', 'category')
+
+
+
+environment_meta_rliabincome_all_environment <- environment_meta_rliabincome_all_environment %>% 
+  mutate(var_income_low=var_income-1.96*var_income_SE,var_income_high=var_income+1.96*var_income_SE )
+
+
+DT::datatable(round_df(environment_meta_rliabincome_all_environment, digits=3))
+
+rm(zz,phewas_b, phewas_se)
+
+
+```
+
+
+
+
+
+
+
+
+### meta-analysis rliabaqi with environmental variables
+
+```{r}
+
+zz <- allphewas_both_zipcode_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=rliabaqi,sei=rliabaqi_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, rliabaqi,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, rliabaqi_SE,1:ncol(.))
+
+environment_meta_rliabaqi_all_environment <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% mutate(category = 'Insurance Claims')
+
+names(environment_meta_rliabaqi_all_environment) <- c('functional_domain','var_aqi','var_aqi_SE', 'category')
+
+
+
+environment_meta_rliabaqi_all_environment <- environment_meta_rliabaqi_all_environment %>% 
+  mutate(var_aqi_low=var_aqi-1.96*var_aqi_SE, var_aqi_high=var_aqi+1.96*var_aqi_SE )
+
+
+DT::datatable(round_df(environment_meta_rliabaqi_all_environment, digits=3))
+
+
+
+
+rm(zz,phewas_b, phewas_se)
+
+
+```
+
+
+
+
+
+
+### meta-analysis rliabtemp with environmental variables
+
+```{r}
+
+zz <- allphewas_both_zipcode_functional_domain %>% 
+  filter(phewas_code != 'COST') %>%
+  filter(phewas_code != 'CNT') %>% 
+  split(.$functional_domain) %>% map(~rma(yi=rliabtemp,sei=rliabtemp_SE,data=., method='DL'))
+
+
+phewas_b <- zz %>% map(summary)  %>%  map_df(~.$b[1]) %>% gather(functional_domain, rliabtemp,1:ncol(.))
+
+phewas_se <- zz %>% map(summary) %>% map_df("se") %>% gather(functional_domain, rliabtemp_SE,1:ncol(.))
+
+environment_meta_rliabtemp_all_environment <- phewas_b %>% inner_join(.,phewas_se, by='functional_domain') %>% 
+  mutate(category = 'Insurance Claims')
+
+names(environment_meta_rliabtemp_all_environment) <- c('functional_domain','var_temp','var_temp_SE', 'category')
+
+
+environment_meta_rliabtemp_all_environment <- environment_meta_rliabtemp_all_environment %>% 
+  mutate(var_temp_low=var_temp-1.96*var_temp_SE, var_temp_high=var_temp+1.96*var_temp_SE )
+
+
+DT::datatable(round_df(environment_meta_rliabtemp_all_environment, digits=3))
+
+
+
+rm(zz,phewas_b, phewas_se)
+
+
+```
+
+
+
+
+
+```{r}
+
+DT::datatable(allphewas_both_zipcode %>% filter(rliabincome.pvalue_FDR <= 0.05) %>% summarise(n=n())   )
+
+DT::datatable(allphewas_both_zipcode %>% filter(rliabaqi.pvalue_FDR <= 0.05) %>% summarise(n=n())   )
+
+DT::datatable(allphewas_both_zipcode %>% filter(rliabtemp.pvalue_FDR <= 0.05) %>% summarise(n=n())   )
+
+
+
+var_environment_confidence_interval <- allphewas_both_zipcode %>% 
+  select(phewas_code, phewas_description, rliabincome, rliabincome_SE, rliabaqi, rliabaqi_SE, rliabtemp, rliabtemp_SE) %>%
+  mutate(rliabincome_low=rliabincome-1.96*rliabincome_SE, rliabincome_high=rliabincome+1.96*rliabincome_SE) %>%
+  mutate(rliabaqi_low=rliabaqi-1.96*rliabaqi_SE, rliabaqi_high=rliabaqi+1.96*rliabaqi_SE) %>%
+  mutate(rliabtemp_low=rliabtemp-1.96*rliabtemp_SE, rliabtemp_high=rliabtemp+1.96*rliabtemp_SE) %>%
+  select(phewas_code, phewas_description, rliabincome,rliabincome_low,rliabincome_high,rliabaqi,rliabaqi_low,rliabaqi_high,rliabtemp,rliabtemp_low,rliabtemp_high)
+
+
+DT::datatable(round_df(var_environment_confidence_interval,digits = 3))
+  
+  
+```
+
+
+## Barplot by functional group - environment
+```{r}
+
+environment_meta_h2_liab_all_environment$stat <- 'h2'
+environment_meta_c2_liab_all_environment$stat <- 'c2'
+#environment_meta_e2_liab_all_environment$stat <- 'e2'
+environment_meta_rliabincome_all_environment$stat <- 'income'
+environment_meta_rliabaqi_all_environment$stat <- 'AQI'
+environment_meta_rliabtemp_all_environment$stat <- 'temperature'
+
+
+a <- environment_meta_h2_liab_all_environment %>% select(functional_domain, statistic = h2, stat)
+b <- environment_meta_c2_liab_all_environment %>% select(functional_domain, statistic = c2, stat)
+#c <- environment_meta_e2_liab_all_environment %>% select(functional_domain, statistic = e2, stat)
+d <- environment_meta_rliabincome_all_environment %>% select(functional_domain, statistic = var_income, stat)
+e <- environment_meta_rliabaqi_all_environment %>% select(functional_domain, statistic = var_aqi, stat)
+f <- environment_meta_rliabtemp_all_environment %>% select(functional_domain, statistic = var_temp, stat)
+
+
+z_meta_all <- a %>% bind_rows(.,b,d,e,f)
+
+rm(a,b,d,e,f)
+
+z_meta_all$stat <- factor(z_meta_all$stat, levels=c('h2','c2','income','AQI','temperature'))
+
+
+z_meta_all$functional_domain <- factor(z_meta_all$functional_domain, 
+                                                 levels = c('All Traits',
+                                                            'Aging',
+                                                            'Cardiovascular',
+                                                            'Cognitive',
+                                                            'Connective tissue',
+                                                            'Dermatological',
+                                                            'Developmental',
+                                                            'Ear,Nose,Throat',
+                                                            'Endocrine',
+                                                            'Environment',
+                                                            'Gastrointestinal',
+                                                            'Hematological',
+                                                            'Immunological',
+                                                            'Infection',
+                                                            'Metabolic',
+                                                            'Neoplasms',
+                                                            'Neurological',
+                                                            'Ophthalmological',
+                                                            'Psychiatric',
+                                                            'Reproduction',
+                                                            'Respiratory',
+                                                            'Skeletal',
+                                                            'Quantitative',
+                                                            'Avg. Monthly Cost',
+                                                            'PheWAS Comorbids'))
+
+
+
+barchart_fn_domain_environment <- ggplot(z_meta_all, aes(functional_domain, statistic, fill=stat)) + 
+  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black") +
+  theme_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) ) +
+    theme(axis.title = element_text()) +
+ylab('Statistic Value') + xlab('Functional Domain') + labs(fill='Statistic') 
+
+barchart_fn_domain_environment
+
+ggsave(barchart_fn_domain_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/barchart_fn_domain_environment.png')
+
+
+
+```
+
+
+
+
+## Barplot by functional group - just environment
+```{r}
+
+environment_meta_rliabincome_all_environment$stat <- 'income'
+environment_meta_rliabaqi_all_environment$stat <- 'AQI'
+environment_meta_rliabtemp_all_environment$stat <- 'temperature'
+
+
+d <- environment_meta_rliabincome_all_environment %>% select(functional_domain, statistic = var_income, stat)
+e <- environment_meta_rliabaqi_all_environment %>% select(functional_domain, statistic = var_aqi, stat)
+f <- environment_meta_rliabtemp_all_environment %>% select(functional_domain, statistic = var_temp, stat)
+
+
+z_meta_all <- d %>% bind_rows(.,e,f)
+
+rm(d,e,f)
+
+z_meta_all$stat <- factor(z_meta_all$stat, levels=c('income','AQI','temperature'))
+
+
+z_meta_all$functional_domain <- factor(z_meta_all$functional_domain, 
+                                                 levels = c('All Traits',
+                                                            'Aging',
+                                                            'Cardiovascular',
+                                                            'Cognitive',
+                                                            'Connective tissue',
+                                                            'Dermatological',
+                                                            'Developmental',
+                                                            'Ear,Nose,Throat',
+                                                            'Endocrine',
+                                                            'Environment',
+                                                            'Gastrointestinal',
+                                                            'Hematological',
+                                                            'Immunological',
+                                                            'Infection',
+                                                            'Metabolic',
+                                                            'Neoplasms',
+                                                            'Neurological',
+                                                            'Ophthalmological',
+                                                            'Psychiatric',
+                                                            'Reproduction',
+                                                            'Respiratory',
+                                                            'Skeletal',
+                                                            'Quantitative',
+                                                            'Avg. Monthly Cost',
+                                                            'PheWAS Comorbids'))
+
+
+
+barchart_fn_domain_just_environment <- ggplot(z_meta_all, aes(functional_domain, statistic, fill=stat)) + 
+  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black") +
+  theme_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) ) +
+    theme(axis.title = element_text()) +
+ylab('Statistic Value') + xlab('Functional Domain') + labs(fill='Statistic') 
+
+barchart_fn_domain_just_environment
+
+ggsave(barchart_fn_domain_just_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/barchart_fn_domain_just_environment.png')
+
+
+
+```
+
+## Number of Phenotypes in each Category with FDR and h2/c2
+
+### h2
+```{r}
+h2_meta <- metaAll_justMatch_h2 %>% filter(category == 'Insurance Claims') %>%
+  mutate(h2_low = h2 - 1.96*h2_SE, h2_high= h2+ 1.96*h2_SE) %>% ungroup()
+
+
+h2_fdr <- allphewas_both_functional_domain %>% group_by(functional_domain) %>% summarise(count_n=n(), fdr_threshold=sum(pvalue_h2_FDR <= 0.05)) %>% mutate(pct_FDR = (fdr_threshold/count_n)*100.0) %>% ungroup()
+
+
+h2_meta_fdr <- h2_meta %>% inner_join(.,h2_fdr, by='functional_domain')
+
+
+h2_meta_fdr <- round_df(h2_meta_fdr, digits=3)
+
+DT::datatable(h2_meta_fdr)
+
+```
+
+
+
+### c2
+```{r}
+c2_meta <- metaAll_justMatch_c2 %>% filter(category == 'Insurance Claims') %>%
+  mutate(c2_low = c2 - 1.96*c2_SE, c2_high= c2+ 1.96*c2_SE) %>% ungroup()
+
+
+c2_fdr <- allphewas_both_functional_domain %>% group_by(functional_domain) %>% summarise(count_n=n(), fdr_threshold=sum(pvalue_c2_FDR <= 0.05)) %>% mutate(pct_FDR = (fdr_threshold/count_n)*100.0) %>% ungroup()
+
+
+c2_meta_fdr <- c2_meta %>% inner_join(.,c2_fdr, by='functional_domain')
+
+
+c2_meta_fdr <- round_df(c2_meta_fdr, digits=3)
+
+DT::datatable(c2_meta_fdr)
+
+```
+
+
+
+### e2
+```{r}
+
+e2_meta <- phewas_meta_e2_liab_all %>% filter(category == 'Insurance Claims') %>%
+  mutate(e2_low = e2 - 1.96*e2_SE, e2_high= e2+ 1.96*e2_SE) %>% ungroup()
+
+
+e2_fdr <- allphewas_both_functional_domain %>% group_by(functional_domain) %>% summarise(count_n=n(), fdr_threshold=sum(e2.pvalue_FDR <= 0.05)) %>% mutate(pct_FDR = (fdr_threshold/count_n)*100.0) %>% ungroup()
+
+
+e2_meta_fdr <- e2_meta %>% inner_join(.,e2_fdr, by='functional_domain')
+
+
+e2_meta_fdr <- round_df(e2_meta_fdr, digits=3)
+
+DT::datatable(e2_meta_fdr)
+
+```
+### Number of Additive Traits
+
+
+```{r}
+
+
+
+
+DT::datatable(allphewas_both %>% filter(c2_liab.pvalue <= 0.05) %>% tally())
+
+DT::datatable(allphewas_both %>% filter(c2_liab.pvalue > 0.05) %>% tally())
+
+
+m_sig <- allphewas_both_functional_domain %>% filter(c2_liab.pvalue <= 0.05) %>% group_by(functional_domain) %>% tally() %>% mutate(sig_num=n) %>% select(-n)
+
+m_non_sig <- allphewas_both_functional_domain %>% filter(c2_liab.pvalue > 0.05) %>% group_by(functional_domain) %>% tally() %>% mutate(insig_num=n) %>% select(-n)
+
+
+m_both <- m_non_sig %>% left_join(., m_sig, by='functional_domain')
+
+
+ m_both[is.na(m_both)] <- 0
+ 
+ m_both$pct_additive <-( m_both$insig_num / (m_both$sig_num + m_both$insig_num) ) * 100
+ 
+  m_both$total <-( (m_both$sig_num + m_both$insig_num) ) 
+ 
+ DT::datatable(round_df(m_both, digits=3)) 
+
+```
+
+
+
+
+###Bonferroni Correction Phenotypes
+```{r}
+
+DT::datatable(allphewas_both %>% filter( pvalue_h2_bonferroni <= 0.05) %>% tally() / 561)
+
+DT::datatable(allphewas_both %>% filter(pvalue_h2_bonferroni > 0.05) %>% tally() / 561)
+
+
+
+DT::datatable(allphewas_both %>% filter( pvalue_c2_bonferroni <= 0.05) %>% tally())
+
+DT::datatable(allphewas_both %>% filter(pvalue_c2_bonferroni > 0.05) %>% tally())
+
+
+
+DT::datatable(round_df(allphewas_both %>% filter( pvalue_h2_bonferroni <= 0.05) %>% tally() / 561, digits=3))
+
+DT::datatable(round_df(allphewas_both %>% filter( pvalue_c2_bonferroni <= 0.05) %>% tally() / 561, digits=3))
+
+
+```
+
+
+h2/c2/e2 for all phenotypes
+```{r}
+phenotypes_h2_c2_e2 <- allphewas_both %>% select(phewas_code, phewas_description, h2_liab, h2_liab_SE, c2_liab, c2_liab_SE, e2, e2_SE) %>% 
+  mutate(h2_low=h2_liab-1.96*h2_liab_SE,h2_high=h2_liab+1.96*h2_liab_SE ) %>%
+  mutate(c2_low=c2_liab-1.96*c2_liab_SE,c2_high=c2_liab+1.96*c2_liab_SE ) %>%
+  mutate(e2_low=e2-1.96*e2_SE,e2_high=e2+1.96*e2_SE ) %>%
+  select(phewas_code, phewas_description, h2_liab,h2_low,h2_high, c2_liab, c2_low,c2_high, e2, e2_low,e2_high)
+
+
+DT::datatable(round_df(phenotypes_h2_c2_e2, digits=3))
+
+```
+
+
+h2/c2/e2 for all phenotypes with p-value
+```{r}
+phenotypes_h2_c2_e2_pvalue <- allphewas_both %>% select(phewas_code, phewas_description, h2_liab, h2_liab_SE, 
+                                                 c2_liab, c2_liab_SE, e2, e2_SE,
+                                                 pvalue_h2_FDR, h2_liab.zscore, pvalue_c2_FDR, c2_liab.zscore, e2.pvalue_FDR, e2.zscore) %>% 
+  mutate(h2_low=h2_liab-1.96*h2_liab_SE,h2_high=h2_liab+1.96*h2_liab_SE ) %>%
+  mutate(c2_low=c2_liab-1.96*c2_liab_SE,c2_high=c2_liab+1.96*c2_liab_SE ) %>%
+  mutate(e2_low=e2-1.96*e2_SE,e2_high=e2+1.96*e2_SE ) %>%
+  select(phewas_code, phewas_description, h2_liab,h2_low,h2_high, pvalue_h2_FDR, h2_liab.zscore,
+         c2_liab, c2_low,c2_high,pvalue_c2_FDR, c2_liab.zscore, e2, e2_low,e2_high, e2.pvalue_FDR, e2.zscore)
+
+
+DT::datatable(round_df(phenotypes_h2_c2_e2_pvalue, digits = 3))
+
+```
+
+
+
+
+
+# Other Plots
+
+
+## Marginal Plots / Scatter plots
+```{r}
+
+allData_meta_all <- allphewas_both %>% 
+  mutate(diff_rss_ros = rliabss-rliabos) %>% mutate(h2_upper = 2*rliabos) %>%
+  mutate(rOS=rliabos, rSS = rliabss)
+
+scatter_h2_c2 <-  ggplot(allData_meta_all, aes(h2, c2)) + 
+  geom_point(aes(colour = c('#008FD5'))) +  
+  xlab('h2') +
+  ylab('c2') + 
+  theme(legend.position="none")  +
+  geom_text(aes(label=ifelse(phewas_code == '984' |  phewas_code == '313.1' |
+                               phewas_code == '134577' | 
+                               phewas_code == '495' | 
+                               phewas_code == '637' | 
+                               phewas_code == '464' 
+                               ,shortName,'')),hjust=0,vjust=0,fontface = "bold", size = 2)
+
+scatter_h2_c2
+
+
+scatter_h2_c2 <- ggMarginal(scatter_h2_c2)
+
+scatter_h2_c2
+
+
+ggsave(scatter_h2_c2, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/scatter_h2_c2.png', width = 5, height = 3)
+
+
+
+
+
+#scatter_h2_e2 <-  ggplot(allData_meta_all, aes(h2, e2)) + 
+#  geom_point(aes(colour = c('#008FD5'))) +  
+#  xlab('h2') +
+#  ylab('e2') + 
+#  theme(legend.position="none")  +
+#    geom_text(aes(label=ifelse(phewas_code == '313.1' | phewas_code == '134577' | phewas_code == '495' | 
+#                                 phewas_code == '871.1' |  phewas_code == '800.3' | phewas_code =='726.3'
+#                               ,shortName,'')),hjust=0,vjust=0,fontface = "bold", size = 2)
+
+
+
+  
+#scatter_h2_e2 <- ggMarginal(scatter_h2_e2)
+
+
+scatter_h2_h2_upper <-  ggplot(allData_meta_all, aes(h2, h2_upper)) + 
+  geom_point(aes(colour = c('#008FD5'))) +  
+  xlab('h2') +
+  ylab('h2_upper (2*rOS)') + 
+  theme(legend.position="none") +
+    geom_text(aes(label=ifelse(phewas_code == '984' |  phewas_code == '313.1' |
+                               phewas_code == '134577' | 
+                               phewas_code == '495' | 
+                               phewas_code == '637' | 
+                               phewas_code == '464' 
+                               ,shortName,'')),hjust=0,vjust=0,fontface = "bold", size = 2)
+
+
+
+  
+scatter_h2_h2_upper <- ggMarginal(scatter_h2_h2_upper)
+
+
+
+scatter_ros_rss <-  ggplot(allData_meta_all, aes(rOS, rSS)) + 
+  geom_point(aes(colour = c('#008FD5'))) +  
+  xlab('rOS') +
+  ylab('rSS') + 
+  theme(legend.position="none") +
+      geom_text(aes(label=ifelse(phewas_code == '362.1' | phewas_code == '464' | 
+                                   phewas_code == '134577' | phewas_code == '696.4' | phewas_code == '313.1'  |
+                                   phewas_code == '871.1',
+                                 shortName,'')),hjust=0,vjust=0,fontface = "bold", size = 2, nudge_x=-.01)
+
+
+
+  
+scatter_ros_rss <- ggMarginal(scatter_ros_rss) 
+
+ggsave(scatter_ros_rss, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/scatter_ros_rss.png',width = 5, height = 3)
+
+
+
+
+scatter_h2_c2_ros_rss <- ggarrange(scatter_h2_c2,scatter_h2_h2_upper ,scatter_ros_rss, 
+          labels = c("a)", "b)", "c)"),
+          ncol = 2, nrow = 2)
+
+scatter_h2_c2_ros_rss
+
+ggsave(scatter_h2_c2_ros_rss, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/scatter_h2_c2_ros_rss.png')
+
+
+
+```
+
+
+
+## Cost CDF/ Count CDF/h2,c2,ros,rss of cost and cnt
+```{r}
+
+
+
+
+cost_comorbid_pheno <- allphewas_both %>% 
+  dplyr::filter(phewas_code == 'COST' | phewas_code == 'CNT')
+
+cost_comorbid_pheno$Description <- c('Number PheWAS Comorbidities','Avg. Monthly Cost')
+
+
+cost_comorbid_pheno <- cost_comorbid_pheno %>% select(phewas_code, Description, rss01=rliabss,rliabss_SE, ros01=rliabos,rliabos_SE,h2_liab, h2_liab_SE, c2_liab, c2_liab_SE)
+
+cost_comorbid_pheno_rss <- cost_comorbid_pheno[,c('phewas_code', 'Description','rss01','rliabss_SE')]  %>% 
+  mutate(statisticType = 'rSS')
+
+cost_comorbid_pheno_ros <- cost_comorbid_pheno %>% 
+  select(phewas_code, Description,ros01,rliabos_SE) %>%
+  mutate(statisticType = 'rOS')
+
+cost_comorbid_pheno_h2 <- cost_comorbid_pheno %>% 
+  select(phewas_code, Description,h2_liab,h2_liab_SE) %>%
+  mutate(statisticType = 'h2')
+
+cost_comorbid_pheno_c2 <- cost_comorbid_pheno %>% 
+  select(phewas_code, Description,c2_liab,c2_liab_SE) %>%
+  mutate(statisticType = 'c2')
+
+names(cost_comorbid_pheno_rss) <- c('phewas_code','Description','statistic','standard_error','statisticType' )
+names(cost_comorbid_pheno_ros) <- c('phewas_code','Description','statistic','standard_error','statisticType')
+names(cost_comorbid_pheno_h2) <- c('phewas_code','Description','statistic','standard_error','statisticType')
+names(cost_comorbid_pheno_c2) <- c('phewas_code','Description','statistic','standard_error','statisticType')
+
+cost_comorbid_pheno_long <- cost_comorbid_pheno_rss %>% 
+  rbind(.,cost_comorbid_pheno_ros) %>% 
+  rbind(.,cost_comorbid_pheno_h2) %>%
+  rbind(.,cost_comorbid_pheno_c2)
+
+
+cost_comorbid_ggplot <- ggplot(cost_comorbid_pheno_long, aes(y=statistic, x=as.factor(Description), colour=statisticType)) + 
+  geom_point(position = position_dodge(width = .5)) +  
+  geom_errorbar(aes(ymin=statistic-1.96*standard_error, ymax=statistic+1.96*standard_error),position = position_dodge(width = 0.5)) + 
+    theme_fivethirtyeight() +
+  theme(axis.text=element_text(size=8))  + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
+  theme(axis.title = element_text()) + ylab('Statistic') + xlab('Phenotype') + labs(color='Statistic Type')
+
+cost_comorbid_ggplot
+
+ggsave(cost_comorbid_ggplot, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/cost_comorbid_ggplot.png')
+
+
+
+
+
+
+costDistribution <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/costDistribution.csv")
+
+
+comorbidDistribution <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/comorbidDistribution.csv")
+
+
+
+costggplotCDF <- ggplot(costDistribution %>% filter(cost >=0), aes(cost )) + stat_ecdf(geom = "step", pad = 'FALSE') + 
+  ylab('Percentage of Twins') + xlab('Average Monthly Cost')
+
+
+comorbidggplotCDF <- ggplot(comorbidDistribution, aes(comorbids )) + stat_ecdf(geom = "step", pad = 'FALSE') +
+  ylab('Percentage of Twins') + xlab('Number of Comorbids')
+
+
+
+
+cdf_cost_comorbid <- ggarrange(costggplotCDF,comorbidggplotCDF,labels = c( "a)", 'b)'))
+
+cdf_cost_comorbid_bar_chart <- ggarrange(cdf_cost_comorbid,cost_comorbid_ggplot,labels = c( "c)", ''), nrow=2)
+
+cdf_cost_comorbid_bar_chart
+
+ggsave(cdf_cost_comorbid_bar_chart,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/cdf_cost_comorbid_bar_chart.png', height = 8, width=8)
+
+
+cost_comorbid_pheno_table <- cost_comorbid_pheno %>% 
+  mutate(rss_low=rss01-1.96*rliabss_SE,rss_high=rss01+1.96*rliabss_SE ) %>%
+  mutate(ros_low=ros01-1.96*rliabos_SE,ros_high=ros01+1.96*rliabos_SE ) %>%
+  mutate(h2_low=h2_liab-1.96*h2_liab_SE,h2_high=h2_liab+1.96*h2_liab_SE ) %>%
+  mutate(c2_low=c2_liab-1.96*c2_liab_SE,c2_high=c2_liab+1.96*c2_liab_SE ) %>%
+select(phewas_code, Description,rss01, rss_low,rss_high, ros01, ros_low, ros_high, h2_liab, h2_low, h2_high,c2_liab, c2_low, c2_high)
+
+DT::datatable(round_df(cost_comorbid_pheno_table, digits=3))
+
+```
+
+
+
+## Twin Year of Birth Analysis
+
+```{r}
+twinPairsYOB <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/twinPairsYOB.csv", 
+    "\t", escape_double = FALSE, col_types = cols(phewas_code = col_character()), 
+    trim_ws = TRUE)
+
+
+twinPairsYOB <- twinPairsYOB %>% inner_join(.,quant_pheno_description, by='phewas_code')
+
+
+twinPairsYOB <- twinPairsYOB %>% mutate(Description = ifelse(phewas_code == 'COST','Binary Phenotypes', Description))
+
+ggplot_ageDistribution <- ggplot(twinPairsYOB, aes(YOB, fill = Description, colour = Description)) + 
+  geom_density(alpha = 0.1) + facet_wrap(~Description) +
+  theme_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) ) +
+ylab('Density') + xlab('Year of Birth') 
+
+
+ggplot_ageDistribution
+
+ggsave(ggplot_ageDistribution, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/ggplot_ageDistribution.png')
+
+
+
+```
+
+
+
+## Volcano Plot
+
+```{r}
+
+thresh_h2 <- allphewas_both_zipcode %>% filter(pvalue_h2_FDR <= 0.05) %>% summarise(val=min(observed_h2))
+thresh_c2 <- allphewas_both_zipcode %>% filter(pvalue_c2_FDR <= 0.05) %>% summarise(val=min(observed_c2))
+thresh_e2 <- allphewas_both_zipcode %>% filter(e2.pvalue_FDR <= 0.05) %>% summarise(val=min(observed_e2))
+
+thresh_rliabincome <- allphewas_both_zipcode %>% 
+  filter(rliabincome.pvalue_FDR <= 0.05) %>% summarise(val=min(observed_rliabincome))
+
+thresh_rliabaqi <- allphewas_both_zipcode %>% 
+  filter(rliabaqi.pvalue_FDR <= 0.05) %>% summarise(val=min(observed_rliabaqi))
+
+thresh_rliabtemp <- allphewas_both_zipcode %>% 
+  filter(rliabtemp.pvalue_FDR <= 0.05) %>% summarise(val=min(observed_rliabtemp))
+
+
+
+fullData_binary_quant <- allphewas_both_zipcode %>% 
+  mutate(twinPrevalenceCategory = as.character(cut(prevalence, breaks=c(0,.10,.30,.80),include.lowest=TRUE,right=FALSE))) %>%
+  replace_na(list(twinPrevalenceCategory='Quantitative Trait')) %>%
+  mutate(h2_rank = rank(-h2_liab.zscore ,ties.method='random')) %>%
+  mutate(c2_rank = rank(-c2_liab.zscore,ties.method='random')) %>%
+  mutate(e2_rank = rank(-e2.zscore,ties.method='random')) %>%
+  mutate(rliabincome_rank = rank(-rliabincome.zscore,ties.method='random')) %>%
+  mutate(rliabaqi_rank = rank(-rliabaqi.zscore,ties.method='random')) %>%
+  mutate(rliabtemp_rank = rank(-rliabtemp.zscore,ties.method='random'))
+
+
+
+
+unique(fullData_binary_quant$twinPrevalenceCategory)
+
+fullData_binary_quant$twinPrevalenceCategory <-factor(fullData_binary_quant$twinPrevalenceCategory, 
+                                                 levels = c('[0,0.1)','[0.1,0.3)','[0.3,0.8]','Quantitative Trait'))
+
+
+
+
+
+alphaLevel <- .6
+
+library(RColorBrewer)
+
+myColors <- c('lightsalmon1','blue','green', 'yellow2')
+names(myColors) <- levels(fullData_binary_quant$twinPrevalenceCategory)
+
+
+
+p1 <-  ggplot(fullData_binary_quant, aes(h2_liab,observed_h2)) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+  
+  xlab('Heritability') + ylab('-log10(p)') +
+  geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  geom_text(position='jitter',aes(label=ifelse((  h2_rank == 3 | h2_rank == 4  ),shortName,'')),hjust=0,vjust=1,fontface = "bold", size = 3) +
+    geom_text(position='jitter',aes(label=ifelse((h2_rank ==1  |h2_rank ==2 | h2_rank ==8 | h2_rank==5 ),shortName,'')),hjust=1,vjust=1,fontface = "bold", size = 3) 
+
+
+
+
+
+
+
+p2 <-  ggplot(fullData_binary_quant, aes(c2_liab,observed_c2)) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+  xlab('Shared Environmental Variance') + ylab('-log10(p)') +
+  geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  geom_text(position='jitter',aes(label=ifelse(( c2_rank ==1  | c2_rank == 2 | c2_rank == 3 | c2_rank ==4  | c2_rank ==6 | c2_rank ==8 ),shortName,'')),hjust=1,vjust=1,fontface = "bold", size = 3) 
+
+
+
+
+
+
+p3 <-  ggplot(fullData_binary_quant, aes(e2,observed_e2)) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory)) + 
+  xlab('Residual Variance') + ylab('-log10(p)') +
+  geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed")  +     
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  geom_text(position='jitter',aes(label=ifelse(( e2_rank ==1  | e2_rank == 2 |  
+                                                   e2_rank ==5 | e2_rank==7  ),shortName,'')),hjust=1,vjust=1,fontface = "bold", size = 3) +
+      geom_text(position='jitter',aes(label=ifelse((e2_rank == 3 ),shortName,'')),hjust=0,vjust=1,fontface = "bold", size = 3) 
+
+
+
+
+
+p4 <-  ggplot(fullData_binary_quant, aes(rliabincome,observed_rliabincome) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+  xlab('Median Income Variance Component') + ylab('-log10(p)') +
+  geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  geom_text(position='jitter',aes(label=ifelse(( rliabincome_rank ==1  | rliabincome_rank == 2 | 
+                                                   rliabincome_rank ==5  ),shortName,'')),hjust=1,vjust=1,fontface = "bold", size = 3) +
+    geom_text(position='jitter',aes(label=ifelse(( rliabincome_rank == 3 | rliabincome_rank==7 
+                                                     ),shortName,'')),hjust=0,vjust=1,fontface = "bold", size = 3) 
+
+
+
+
+p5 <-  ggplot(fullData_binary_quant, aes(rliabaqi,observed_rliabaqi) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+  geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  geom_text(position='jitter',aes(label=ifelse(( rliabaqi_rank ==1  | rliabaqi_rank == 2 | 
+                                                   rliabaqi_rank ==4  | rliabaqi_rank == 5 | 
+                                                   rliabaqi_rank ==6),shortName,'')),hjust=1,vjust=1,fontface = "bold", size = 3) +
+    geom_text(position='jitter',aes(label=ifelse(( rliabaqi_rank ==3    ),shortName,'')),hjust=0,vjust=1,fontface = "bold", size = 3)  +   xlab('Monthly AQI Variance Component') + ylab('-log10(p)') 
+
+
+
+
+p6 <-  ggplot(fullData_binary_quant, aes(rliabtemp,observed_rliabtemp) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+  xlab('Monthly Temperature Variance Component') + ylab('-log10(p)') +
+  geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  geom_text(position='jitter',aes(label=ifelse(( rliabtemp_rank ==1  | rliabtemp_rank == 2 | 
+                                                   rliabtemp_rank ==3 | rliabtemp_rank == 5 | 
+                                                   rliabtemp_rank ==6
+                                                   ),shortName,'')),hjust=1,vjust=1,fontface = "bold", size = 3) +
+  geom_text(position='jitter',aes(label=ifelse(( rliabtemp_rank ==4  ),shortName,'')),hjust=0,vjust=1,fontface = "bold", size = 3) 
+
+
+
+volcano_plot <- ggarrange(p1,p2, p4 , p5, p6, labels = c( 'b)', 'c)','d)', 'e)' ,'f)' ), common.legend = TRUE, nrow=3,ncol = 2, legend  = 'bottom')
+
+
+
+barchart_fn_domain
+
+volcano_bar_chart <- ggarrange(barchart_fn_domain,volcano_plot, labels=c('a)',''), nrow = 2,heights   = 1:2)
+
+volcano_bar_chart
+
+ggsave(volcano_bar_chart,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/volcano_bar_chart.png', height = 12, width = 10)
+
+
+
+
+
+
+
+
+```
+
+
+```{r}
+
+phenotypes_cost_variancecomponents_h2 <- allphewas_both %>% 
+  select(phewas_code, phewas_description, h2=h2_liab,avgCostPheWAS_month,avgCostPheWAS_ratio, shortName, pvalue_h2_FDR, prevalence) %>%  filter(avgCostPheWAS_ratio <= 1.0) %>%
+  mutate(twinPrevalenceCategory = as.character(cut(prevalence, breaks=c(0,.10,.30,.80),include.lowest=TRUE,right=FALSE))) %>%
+  filter(pvalue_h2_FDR <= 0.05) %>%
+    mutate(rank_cost=rank(-avgCostPheWAS_month), rank_cost_ratio=rank(-avgCostPheWAS_ratio) ) %>% 
+  select(-pvalue_h2_FDR) %>% 
+  mutate(variance_component='h2')
+
+phenotypes_cost_variancecomponents_c2 <- allphewas_both %>% 
+  select(phewas_code, phewas_description, c2=c2_liab, avgCostPheWAS_month,avgCostPheWAS_ratio, shortName, pvalue_c2_FDR,prevalence) %>% filter(avgCostPheWAS_ratio <= 1.0) %>%
+  mutate(twinPrevalenceCategory = as.character(cut(prevalence, breaks=c(0,.10,.30,.80),include.lowest=TRUE,right=FALSE))) %>%
+    filter(pvalue_c2_FDR <= 0.05) %>%
+  mutate(rank_cost=rank(-avgCostPheWAS_month), rank_cost_ratio=rank(-avgCostPheWAS_ratio) ) %>% 
+  select(-pvalue_c2_FDR) %>% 
+  filter(avgCostPheWAS_ratio <= 1.0) %>% mutate(variance_component='c2')
+
+
+phenotypes_cost_variancecomponents_e2 <- allphewas_both %>% 
+  select(phewas_code, phewas_description, e2,avgCostPheWAS_month,avgCostPheWAS_ratio, shortName, e2.pvalue_FDR,prevalence) %>% filter(avgCostPheWAS_ratio <= 1.0) %>%
+    mutate(twinPrevalenceCategory = as.character(cut(prevalence, breaks=c(0,.10,.30,.80),include.lowest=TRUE,right=FALSE))) %>%
+  filter(e2.pvalue_FDR <= 0.05) %>%
+  mutate(rank_cost=rank(-avgCostPheWAS_month), rank_cost_ratio=rank(-avgCostPheWAS_ratio) ) %>% 
+  select(-e2.pvalue_FDR) %>% 
+  filter(avgCostPheWAS_ratio <= 1.0) %>% mutate(variance_component='e2')
+
+
+
+
+alphaLevel <- .6
+
+library(RColorBrewer)
+library(ggrepel)
+
+myColors <- c('lightsalmon1','blue','green')
+names(myColors) <- levels(phenotypes_cost_variancecomponents_e2$twinPrevalenceCategory)
+
+
+
+
+q1 <-  ggplot(phenotypes_cost_variancecomponents_h2, aes(h2,avgCostPheWAS_month) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  ggrepel::geom_label_repel(position='jitter',aes(label=ifelse(( rank_cost ==1  | rank_cost == 2 | rank_cost == 4  | rank_cost ==3 | rank_cost ==5),shortName,'')),fontface = 'bold' , size = 3,box.padding = 1) +
+  xlab('Heritability') + ylab('Average Monthly Cost due to Phenotype') 
+
+
+
+
+
+
+q2 <-  ggplot(phenotypes_cost_variancecomponents_h2, aes(h2,avgCostPheWAS_ratio) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  ggrepel::geom_label_repel(position='jitter',aes(label=ifelse(( rank_cost_ratio >=1 & rank_cost_ratio <=5),shortName,'')),fontface = 'bold' , size = 3) +
+  xlab('Heritability') + ylab('Ratio of Total Cost due to Phenotype') 
+
+
+
+
+q3 <-  ggplot(phenotypes_cost_variancecomponents_c2, aes(c2,avgCostPheWAS_month) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  ggrepel::geom_label_repel(position='jitter',aes(label=ifelse(( rank_cost ==1  | rank_cost == 2 | rank_cost == 3  | rank_cost ==4 | rank_cost ==6),shortName,'')),fontface = 'bold', size=3) +
+  xlab('Shared Environmental Variance') + ylab('Average Monthly Cost due to Phenotype') 
+
+
+
+
+q4 <-  ggplot(phenotypes_cost_variancecomponents_c2, aes(c2,avgCostPheWAS_ratio) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  ggrepel::geom_label_repel(position='jitter',aes(label=ifelse(( rank_cost_ratio ==1 | rank_cost_ratio ==2 | rank_cost_ratio ==3 | rank_cost_ratio ==4 | rank_cost_ratio ==6 ),shortName,'')),fontface = 'bold' , size = 3) +
+  xlab('Shared Environmental Variance') + ylab('Ratio of Total Cost due to Phenotype') 
+
+
+
+
+
+q5 <-  ggplot(phenotypes_cost_variancecomponents_e2, aes(e2,avgCostPheWAS_month) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  ggrepel::geom_label_repel(position='jitter',aes(label=ifelse(( rank_cost ==1  | rank_cost == 2 | rank_cost == 3  | rank_cost ==9 | rank_cost ==6),shortName,'')),fontface = 'bold' , size = 3) +
+  xlab('Residual Variance') + ylab('Average Monthly Cost due to Phenotype') 
+
+
+
+
+q6 <-  ggplot(phenotypes_cost_variancecomponents_e2, aes(e2,avgCostPheWAS_ratio) ) + 
+  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
+    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
+  ggrepel::geom_label_repel(position='jitter',aes(label=ifelse(( rank_cost_ratio ==1 | rank_cost_ratio ==2 | rank_cost_ratio ==4 | rank_cost_ratio ==6 | rank_cost_ratio ==5),shortName,'')),fontface = 'bold' , size = 3) +
+  xlab('Residual Variance') + ylab('Ratio of Total Cost due to Phenotype') 
+
+
+
+
+
+
+
+h2_c2_e2_cost_scatter <- ggarrange(q1,q2,q3, q4,labels = c( 'a)', 'b)', 'c)', 'd)') ,nrow = 2, ncol = 2 , common.legend = TRUE, legend  = 'bottom')
+
+h2_c2_e2_cost_scatter
+
+ggsave(h2_c2_e2_cost_scatter,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/h2_c2_e2_cost_scatter.png',height=9, width = 9)
+
+
+
+```
+
+
+
+
+```{r}
+cor_h2_month_cost <- allphewas_both %>% filter(!is.na(h2_liab),avgCostPheWAS_month <= 50000000000 ) %>% do(fit=cor.test(.$h2_liab,.$avgCostPheWAS_month ))
+
+cor_h2_month_cost %>% tidy(fit) %>% round_df(digits=3)
+
+
+cor_c2_month_cost <- allphewas_both %>% filter(!is.na(c2_liab),avgCostPheWAS_month <= 50000000000 ) %>% do(fit=cor.test(.$c2_liab,.$avgCostPheWAS_month ))
+
+cor_c2_month_cost %>% tidy(fit) %>% round_df(digits=3)
+
+
+cor_e2_month_cost <- allphewas_both %>% filter(!is.na(e2),avgCostPheWAS_ratio <= 50000000000 ) %>% do(fit=cor.test(.$e2,.$avgCostPheWAS_month ))
+
+cor_e2_month_cost %>% tidy(fit) %>% round_df(digits=3)
+
+
+cor_h2_ratio_cost <- allphewas_both %>% filter(!is.na(h2_liab),avgCostPheWAS_ratio <= 1.2 ) %>% do(fit=cor.test(.$h2_liab,.$avgCostPheWAS_ratio ))
+
+cor_h2_ratio_cost %>% tidy(fit) %>% round_df(digits=3)
+
+
+cor_c2_ratio_cost <- allphewas_both %>% filter(!is.na(c2_liab),avgCostPheWAS_ratio <= 1.2 ) %>% do(fit=cor.test(.$c2_liab,.$avgCostPheWAS_ratio ))
+
+cor_c2_ratio_cost %>% tidy(fit) %>% round_df(digits=3)
+
+
+cor_e2_ratio_cost <- allphewas_both %>% filter(!is.na(e2),avgCostPheWAS_ratio <= 1.2 ) %>% do(fit=cor.test(.$e2,.$avgCostPheWAS_ratio ))
+
+cor_e2_ratio_cost %>% tidy(fit) %>% round_df(digits=3)
+
+
+```
+
+
+```{r}
+cost_with_variance_component <- allphewas_both %>% 
+  select(phewas_code, phewas_description, h2_liab, h2_liab_SE, c2_liab, c2_liab_SE, e2, e2_SE, avgCostPheWAS_month, avgCostPheWAS_ratio) %>%
+  mutate(h2_low= h2_liab - 1.96* h2_liab_SE, h2_high= h2_liab + 1.96* h2_liab_SE ) %>%
+  mutate(c2_low= c2_liab - 1.96* c2_liab_SE, c2_high= c2_liab + 1.96* c2_liab_SE ) %>%
+mutate(e2_low= e2 - 1.96* e2_SE, e2_high= e2 + 1.96* e2_SE ) %>%
+  select(phewas_code, phewas_description, h2_liab,h2_low, h2_high, c2_liab, c2_low, c2_high, e2, e2_low, e2_high, avgCostPheWAS_month, avgCostPheWAS_ratio)
+
+
+DT::datatable(round_df(cost_with_variance_component, digits = 3))
+
+```
+
+
+### Dataframes for Rshiny App
+```{r, eval=FALSE}
+
+rawData <- allphewas_both %>% select(phewas_code,phewas_description, 
+                                     h2=h2_liab, h2_SE=h2_liab_SE, h2.zscore=h2_liab.zscore, h2.pvalue=h2_liab.pvalue,
+                                     c2=c2_liab, c2_SE=c2_liab_SE, c2.zscore=c2_liab.zscore, c2.pvalue=c2_liab.pvalue, 
+                                     e2, e2_SE, e2.zscore, e2.pvalue,
+                                    rss=rliabss, rss_SE=rliabss_SE, rss.zscore=rliabss_liab.zscore, rss.pvalue=rliabss_liab.pvalue, 
+                                    ros=rliabos, ros_SE=rliabos_SE, ros.zscore=rliabos_liab.zscore, ros.pvalue=rliabos_liab.pvalue,
+                                    prevalence=K, avgCostPheWAS_month, avgCostPheWAS_ratio, twin)
+
+
+rawData <- rawData %>%   mutate(h2_rank = rank(-h2.zscore ,ties.method='random')) %>%
+  mutate(c2_rank = rank(-c2.zscore,ties.method='random')) %>%
+  mutate(e2_rank = rank(-e2.zscore,ties.method='random')) %>%
+  mutate(rank_cost=rank(-avgCostPheWAS_month), rank_cost_ratio=rank(-avgCostPheWAS_ratio) ) 
+
+
+saveRDS(rawData, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/allphenotypes_noenvironment.rds')
+
+
+
+
+rawData_environment <- allphewas_both_zipcode %>% select(phewas_code,phewas_description, 
+                                     h2=h2_liab, h2_SE=h2_liab_SE, h2.zscore=h2_liab.zscore, h2.pvalue=h2_liab.pvalue,
+                                     c2=c2_liab, c2_SE=c2_liab_SE, c2.zscore=c2_liab.zscore, c2.pvalue=c2_liab.pvalue, 
+                                     e2, e2_SE, e2.zscore, e2.pvalue,
+                                    rss=rliabss, rss_SE=rliabss_SE, rss.zscore=rliabss_liab.zscore, rss.pvalue=rliabss_liab.pvalue, 
+                                    ros=rliabos, ros_SE=rliabos_SE, ros.zscore=rliabos_liab.zscore, ros.pvalue=rliabos_liab.pvalue,
+                                    prevalence=K, avgCostPheWAS_month, avgCostPheWAS_ratio,
+                                    var_income=rliabincome, var_income_SE=rliabincome_SE, var_income.zscore=rliabincome.zscore, var_income.pvalue=rliabincome.pvalue,
+                                    var_aqi=rliabaqi, var_aqi_SE=rliabaqi_SE, var_aqi.zscore=rliabaqi.zscore, var_aqi.pvalue=rliabaqi.pvalue,
+                                                                        var_temp=rliabtemp, var_temp_SE=rliabtemp_SE, var_temp.zscore=rliabtemp.zscore, var_temp.pvalue=rliabtemp.pvalue)
+
+
+rawData_environment <- rawData_environment %>%  
+   mutate(h2_rank = rank(-h2.zscore ,ties.method='random')) %>%
+  mutate(c2_rank = rank(-c2.zscore,ties.method='random')) %>%
+  mutate(e2_rank = rank(-e2.zscore,ties.method='random')) %>%
+  mutate(rank_cost=rank(-avgCostPheWAS_month), rank_cost_ratio=rank(-avgCostPheWAS_ratio) )  %>%
+  mutate(rliabincome_rank = rank(-var_income.zscore,ties.method='random')) %>%
+  mutate(rliabaqi_rank = rank(-var_aqi.zscore,ties.method='random')) %>%
+  mutate(rliabtemp_rank = rank(-var_temp.zscore,ties.method='random'))
+
+
+
+
+saveRDS(rawData_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/allphenotypes_environment.rds')
+
+
+
+
+meta_analytic_estimates_noenvironment <- phewas_meta_h2_liab_all %>%
+  bind_rows(., phewas_meta_c2_liab_all, phewas_meta_e2_liab_all,
+            phewas_meta_ros_liab_all, phewas_meta_rss_liab_all)
+
+
+
+meta_analytic_estimates_environment <- environment_meta_h2_liab_all_environment %>%
+  bind_rows(., 
+            environment_meta_c2_liab_all_environment,
+            environment_meta_e2_liab_all_environment,
+            environment_meta_rliabincome_all_environment,
+            environment_meta_rliabaqi_all_environment,
+            environment_meta_rliabtemp_all_environment)
+
+saveRDS(meta_analytic_estimates_noenvironment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/meta_analytic_estimates_noenvironment.rds')
+
+
+saveRDS(meta_analytic_estimates_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/meta_analytic_estimates_environment.rds')
+
+
+insurance_matchComparison <- metaAll_justMatch_h2 %>% bind_rows(.,metaAll_justMatch_c2)
+
+
+saveRDS(insurance_matchComparison, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/insurance_matchComparison.rds')
+
+
+```
+
+```{r}
+prev_round <- round_df(prev, digits = 3)
+
+```
+
+
+## Cost of Twins Attributed to top 5%
+```{r}
+
+twinCostYearly <- readRDS(file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/twinCostYearly.rds') %>% filter(yearService >=2008, yearService < 2016) %>% filter(complete.cases(.))
+
+
+costPerYear <- twinCostYearly %>% group_by(yearService) %>% summarise(totalCost=sum(costValues, na.rm = TRUE)) %>% ungroup()
+
+twinCostYearly_quantile <- twinCostYearly %>% group_by(yearService) %>% 
+  mutate(categoryCut=ntile(costValues,20)) %>% ungroup() %>%
+  group_by(categoryCut,yearService) %>% summarise(totalCostCategory=sum(costValues)) %>%
+  ungroup() %>% inner_join(.,costPerYear, by='yearService') %>%
+  mutate(pct_total=totalCostCategory/totalCost)
+
+
+twinCostYearly_quantile_low <- twinCostYearly_quantile %>% filter(categoryCut < 20) %>% group_by(yearService) %>%
+  summarise(sumpct=sum(pct_total)) %>% ungroup()
+
+twinCostYearly_quantile_high <- twinCostYearly_quantile %>% filter(categoryCut >= 20) %>% 
+  group_by(yearService) %>%
+  summarise(sumpct=sum(pct_total)*100) %>% ungroup()
+
+DT::datatable(round_df(twinCostYearly_quantile_high, digits = 3))
+
+
+```
+
+
+
+
+```{r}
+DT::datatable(allphewas_both_zipcode %>% select(phewas_code, phewas_description, rliabincome, rliabincome.pvalue, rliabincome.pvalue_FDR, rliabaqi,rliabaqi.pvalue, rliabaqi.pvalue_FDR, rliabtemp, rliabtemp.pvalue, rliabtemp.pvalue_FDR))
+
+
+z1 <- allphewas_both_zipcode %>% select(phewas_code, phewas_description, h2_liab, h2_liab_SE,c2_liab, c2_liab_SE, e2, e2_SE) %>%
+    mutate(h2_low=h2_liab-1.96*h2_liab_SE, h2_high=h2_liab+1.96*h2_liab_SE) %>%
+  mutate(c2_low=c2_liab-1.96*c2_liab_SE, c2_high=c2_liab+1.96*c2_liab_SE) %>%
+  mutate(e2_low=e2-1.96*e2_SE, e2_high=e2+1.96*e2_SE)
+
+z2 <- allphewas_both %>% select(phewas_code, phewas_description,h2_liab, h2_liab_SE, c2_liab, c2_liab_SE, e2, e2_SE) %>%
+      mutate(h2_low=h2_liab-1.96*h2_liab_SE, h2_high=h2_liab+1.96*h2_liab_SE) %>%
+  mutate(c2_low=c2_liab-1.96*c2_liab_SE, c2_high=c2_liab+1.96*c2_liab_SE) %>%
+  mutate(e2_low=e2-1.96*e2_SE, e2_high=e2+1.96*e2_SE)
+
+DT::datatable(round_df(z1, digits = 3))
+
+DT::datatable(round_df(z2, digits=3))
+
+```
+
+
+
+
+
+
+
+```{r}
+
+covariates <- allphewas_both_functional_domain %>% 
+  select(phewas_code, phewas_description, 
+         `MemberBirthYear`, `MemberBirthYear_SE`, `as.factor(Gender)M`, `as.factor(Gender)M_SE`,functional_domain, h2_liab, c2_liab)
+
+
+covariates$functional_domain <- factor(covariates$functional_domain, 
+                                                 levels = c('All Traits',
+                                                            'Aging',
+                                                            'Cardiovascular',
+                                                            'Cognitive',
+                                                            'Connective tissue',
+                                                            'Dermatological',
+                                                            'Developmental',
+                                                            'Ear,Nose,Throat',
+                                                            'Endocrine',
+                                                            'Environment',
+                                                            'Gastrointestinal',
+                                                            'Hematological',
+                                                            'Immunological',
+                                                            'Infection',
+                                                            'Metabolic',
+                                                            'Neoplasms',
+                                                            'Neurological',
+                                                            'Ophthalmological',
+                                                            'Psychiatric',
+                                                            'Reproduction',
+                                                            'Respiratory',
+                                                            'Skeletal',
+                                                            'Quantitative',
+                                                            'Avg. Monthly Cost',
+                                                            'PheWAS Comorbids'))
+
+covariates<- covariates %>% filter(functional_domain != 'PheWAS Comorbids' ) %>%
+  filter(functional_domain != 'Avg. Monthly Cost' ) %>%
+    filter(functional_domain != 'All Traits' ) %>%
+      filter(functional_domain != 'Quantitative' )
+
+
+  
+
+
+age_covariate <- ggplot(covariates, aes(functional_domain, MemberBirthYear)) + 
+  geom_boxplot(aes(fill = functional_domain)) +
+  theme_fivethirtyeight() +
+  scale_color_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) )  + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
+  theme(axis.title = element_text()) + ylab('Effect Size for Age') + xlab('Functional Domain') +
+  theme(legend.position="none")
+  
+age_covariate
+
+ggsave(age_covariate, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/age_covariate.png')
+
+
+age_gender <- ggplot(covariates, aes(functional_domain, `as.factor(Gender)M`)) + 
+  geom_boxplot(aes(fill = functional_domain)) +
+  theme_fivethirtyeight() +
+  scale_color_fivethirtyeight() +
+  theme(axis.text.x=element_text(angle=45), text=element_text(size=8) )  + 
+  scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
+  theme(axis.title = element_text()) + ylab('Effect Size for Gender') + xlab('Functional Domain') +
+  theme(legend.position="none")
+  
+age_gender
+
+ggsave(age_gender, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/age_gender.png')
+
+
+covariates <- covariates %>% mutate(age_low=MemberBirthYear - 1.96*MemberBirthYear_SE,
+                                    age_high=MemberBirthYear + 1.96*MemberBirthYear_SE, 
+                                    gender_low=`as.factor(Gender)M` - 1.96*`as.factor(Gender)M_SE`,
+                                    gender_high=`as.factor(Gender)M` + 1.96*`as.factor(Gender)M_SE`)
+
+covariates_remove_fn_domain <- allphewas_both %>% 
+  select(phewas_description, phewas_code, MemberBirthYear, 
+         MemberBirthYear_SE,`as.factor(Gender)M`,`as.factor(Gender)M_SE`) %>%
+          mutate(MemberBirthYear.zscore=MemberBirthYear/MemberBirthYear_SE) %>%
+                  mutate(gender.zscore=`as.factor(Gender)M`/`as.factor(Gender)M_SE`) %>%
+                  mutate(MemberBirthYear.pvalue=2*pnorm(-abs(MemberBirthYear.zscore))) %>%
+                  mutate(gender.pvalue=2*pnorm(-abs(gender.zscore))) %>%
+                  mutate(pvalue_MemberBirthYear_FDR = p.adjust(.$MemberBirthYear.pvalue, method='BY')) %>%
+                  mutate(pvalue_gender_FDR = p.adjust(.$gender.pvalue, method='BY')) %>%
+  mutate(age_low=MemberBirthYear-1.96*MemberBirthYear_SE,
+         age_high=MemberBirthYear+1.96*MemberBirthYear_SE,
+         gender_low= `as.factor(Gender)M` - 1.96*`as.factor(Gender)M_SE`, 
+         gender_high=`as.factor(Gender)M` + 1.96*`as.factor(Gender)M_SE`, 
+         abs_age=abs(MemberBirthYear.zscore), abs_gender=abs(gender.zscore))
+  
+
+
+DT::datatable(covariates_remove_fn_domain %>% filter(pvalue_MemberBirthYear_FDR <= 0.05) %>% tally())
+DT::datatable(covariates_remove_fn_domain %>% filter(pvalue_gender_FDR <= 0.05) %>% tally())
+
+
+DT::datatable(round_df(covariates_remove_fn_domain, digits=3))
+
+
+
+```
+
+
+
+
+
+
+
+```{r}
+
+
+
+allphewas_both <- allphewas_both %>%   mutate(twinPrevalenceCategory = as.character(cut(prevalence, breaks=c(0,.10,.30,.80),include.lowest=TRUE,right=FALSE))) %>%
+  replace_na(list(twinPrevalenceCategory='Quantitative Trait')) %>% 
+  select(-h2, -c2, -h2_SE, -c2_SE, -r_OS, -r_OS_SE, -r_SS, -r_SS_SE )
+
+
+allphewas_both_zipcode <- allphewas_both_zipcode %>%   mutate(twinPrevalenceCategory = as.character(cut(prevalence, breaks=c(0,.10,.30,.80),include.lowest=TRUE,right=FALSE))) %>%
+  replace_na(list(twinPrevalenceCategory='Quantitative Trait')) %>%
+    select(-h2, -c2, -h2_SE, -c2_SE, -r_OS, -r_OS_SE, -r_SS, -r_SS_SE )
+
+
+allphewas_both$twinPrevalenceCategory <-factor(allphewas_both$twinPrevalenceCategory, 
+                                                 levels = c('[0,0.1)','[0.1,0.3)','[0.3,0.8]','Quantitative Trait'))
+
+allphewas_both_zipcode$twinPrevalenceCategory <-factor(allphewas_both_zipcode$twinPrevalenceCategory, 
+                                                 levels = c('[0,0.1)','[0.1,0.3)','[0.3,0.8]','Quantitative Trait'))
+
+allphewas_both <- round_df(allphewas_both, digits = 3)
+allphewas_both_zipcode <- round_df(allphewas_both_zipcode, digits = 3)
+
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'h2_liab'] <- 'h2'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'c2_liab'] <- 'c2'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabtemp'] <- 'var_temp'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabaqi'] <- 'var_aqi'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabincome'] <- 'var_income'
+
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'h2_liab_SE'] <- 'h2_SE'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'c2_liab_SE'] <- 'c2_SE'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabtemp_SE'] <- 'var_temp_SE'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabaqi_SE'] <- 'var_aqi_SE'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabincome_SE'] <- 'var_income_SE'
+
+
+
+names(allphewas_both)[names(allphewas_both) == 'h2_liab'] <- 'h2'
+names(allphewas_both)[names(allphewas_both) == 'c2_liab'] <- 'c2'
+
+names(allphewas_both)[names(allphewas_both) == 'h2_liab_SE'] <- 'h2_SE'
+names(allphewas_both)[names(allphewas_both) == 'c2_liab_SE'] <- 'c2_SE'
+
+names(allphewas_both)[names(allphewas_both) == 'rliabss'] <- 'r_SS'
+names(allphewas_both)[names(allphewas_both) == 'rliabos'] <- 'r_OS'
+names(allphewas_both)[names(allphewas_both) == 'rliabss_SE'] <- 'r_SS_SE'
+names(allphewas_both)[names(allphewas_both) == 'rliabos_SE'] <- 'r_OS_SE'
+
+
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabss'] <- 'r_SS'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabos'] <- 'r_OS'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabss_SE'] <- 'r_SS_SE'
+names(allphewas_both_zipcode)[names(allphewas_both_zipcode) == 'rliabos_SE'] <- 'r_OS_SE'
+
+
+
+saveRDS(allphewas_both, file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/btShinyUI/CATCH/allphewas_both.rds')
+
+saveRDS(allphewas_both_zipcode, file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/btShinyUI/CATCH/allphewas_both_zipcode.rds')
+
+
+```
