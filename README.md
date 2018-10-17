@@ -9,4 +9,4 @@ This github repo consists of code used for the analysis of our paper titled "Rep
 Note:
 It is not possible to run the scripts in manuscriptAnalysis because some of the data needed for the scripts contain personally identifiable information.  All of the summary data for our analysis can be found in the CaTCH webapp.  
 
-Additional detailed analysis can be on our "Claims Analysis of Twin Correlation and Heritability (CaTCH)" web application : http://apps.chiragjpgroup.org/catch/
+Additional detailed analysis can be found on our "Claims Analysis of Twin Correlation and Heritability (CaTCH)" web application : http://apps.chiragjpgroup.org/catch/
