@@ -108,11 +108,6 @@ names(allphewas_binary) <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/genetic
 phewas_high_K <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/phewas_high_K.rds')
 
 
-allphewas_binary <- allphewas_binary %>% 
-  mutate(h2_liab_SE_se = ifelse(phewas_code == '984',h2_SE,h2_liab_SE_se)) %>%
-  mutate(rliabss_SE_se = ifelse(phewas_code == '984',r_SS_SE,rliabss_SE_se)) %>%
-  mutate(c2_liab_SE_se = ifelse(phewas_code == '984',c2_SE,c2_liab_SE_se)) %>%
-    mutate(rliabos_SE_se = ifelse(phewas_code == '984',r_OS_SE,rliabos_SE_se)) 
 
 
 names(allphewas_binary) <- sub("_se", "", names(allphewas_binary))
@@ -193,12 +188,7 @@ allphewas_binary_zipcode <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/gen
 names(allphewas_binary_zipcode) <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/names_binary_zipcode.rds')
 
 
-allphewas_binary_zipcode <- allphewas_binary_zipcode %>%
-  mutate(h2_liab_SE_se = ifelse(phewas_code == '984',h2_SE,h2_liab_SE_se)) %>%
-  mutate(rliabss_SE_se = ifelse(phewas_code == '984',r_SS_SE,rliabss_SE_se)) %>%
-  mutate(c2_liab_SE_se = ifelse(phewas_code == '984',c2_SE,c2_liab_SE_se)) %>%
-    mutate(rliabos_SE_se = ifelse(phewas_code == '984',r_OS_SE,rliabos_SE_se)) 
-
+allphewas_binary_zipcode <- allphewas_binary_zipcode 
 
 
 
@@ -1583,12 +1573,12 @@ environment_meta_rliabaqi_all_environment$stat <- 'AQI'
 environment_meta_rliabtemp_all_environment$stat <- 'temperature'
 
 
-a <- environment_meta_h2_liab_all_environment %>% select(functional_domain, statistic = h2, stat)
-b <- environment_meta_c2_liab_all_environment %>% select(functional_domain, statistic = c2, stat)
+a <- environment_meta_h2_liab_all_environment %>% select(functional_domain, statistic = h2,se=h2_SE, stat)
+b <- environment_meta_c2_liab_all_environment %>% select(functional_domain, statistic = c2, se=c2_SE, stat)
 #c <- environment_meta_e2_liab_all_environment %>% select(functional_domain, statistic = e2, stat)
-d <- environment_meta_rliabincome_all_environment %>% select(functional_domain, statistic = var_income, stat)
-e <- environment_meta_rliabaqi_all_environment %>% select(functional_domain, statistic = var_aqi, stat)
-f <- environment_meta_rliabtemp_all_environment %>% select(functional_domain, statistic = var_temp, stat)
+d <- environment_meta_rliabincome_all_environment %>% select(functional_domain, statistic = var_income,se=var_income_SE, stat)
+e <- environment_meta_rliabaqi_all_environment %>% select(functional_domain, statistic = var_aqi,se=var_aqi_SE, stat)
+f <- environment_meta_rliabtemp_all_environment %>% select(functional_domain, statistic = var_temp,se=var_temp_SE, stat)
 
 
 z_meta_all <- a %>% bind_rows(.,b,d,e,f)
@@ -1626,20 +1616,37 @@ z_meta_all$functional_domain <- factor(z_meta_all$functional_domain,
                                                             'PheWAS Comorbids'))
 
 
+size_text <- 4
 
 barchart_fn_domain_environment <- ggplot(z_meta_all, aes(functional_domain, statistic, fill=stat)) + 
-  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black") +
-  theme(axis.text.x=element_text(angle=45, size = 8),
-        axis.title.x = element_text(vjust=10)) +
-ylab('Statistic Value') + xlab('Functional Domain') + labs(fill='Statistic')  +
-  theme(legend.position="bottom")
+  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black", size=.2) +
+  theme(legend.position=c(.25,.75),legend.direction = "horizontal") +     
+  theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 30, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text,vjust=4),
+        axis.title.y = element_text(size=size_text,vjust=-1)) +
+  theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) +
+  theme(legend.key.size = unit(.2, "cm")) +
+    geom_errorbar(aes(ymin=statistic-1.96*se, 
+                    ymax=statistic+1.96*se),
+                width=.5,size=.2,
+                position=position_dodge(.9))
+
 
 
 barchart_fn_domain_environment
 
-ggsave(barchart_fn_domain_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/barchart_fn_domain_environment.png')
+#ggsave(barchart_fn_domain_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/barchart_fn_domain_environment.png')
 
 braden_df_meta_analytic_estimates_environment <- z_meta_all
+
+
+
+
+ggsave(barchart_fn_domain_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_5.jpg',dpi='print',
+       device = 'jpeg', width = 3,height= 2)
+
 
 ```
 
@@ -1654,9 +1661,9 @@ environment_meta_rliabaqi_all_environment$stat <- 'AQI'
 environment_meta_rliabtemp_all_environment$stat <- 'temperature'
 
 
-d <- environment_meta_rliabincome_all_environment %>% select(functional_domain, statistic = var_income, stat)
-e <- environment_meta_rliabaqi_all_environment %>% select(functional_domain, statistic = var_aqi, stat)
-f <- environment_meta_rliabtemp_all_environment %>% select(functional_domain, statistic = var_temp, stat)
+d <- environment_meta_rliabincome_all_environment %>% select(functional_domain, statistic = var_income, se=var_income_SE, stat)
+e <- environment_meta_rliabaqi_all_environment %>% select(functional_domain, statistic = var_aqi, se=var_aqi_SE, stat)
+f <- environment_meta_rliabtemp_all_environment %>% select(functional_domain, statistic = var_temp,se=var_temp_SE, stat)
 
 
 z_meta_all <- d %>% bind_rows(.,e,f)
@@ -1695,16 +1702,44 @@ z_meta_all$functional_domain <- factor(z_meta_all$functional_domain,
 
 
 
+#barchart_fn_domain_just_environment <- ggplot(z_meta_all, aes(functional_domain, statistic, fill=stat)) + 
+#  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black") +
+#  theme(axis.text.x=element_text(angle=45, size = 8),
+#        axis.title.x = element_text(vjust=10)) +
+#ylab('Statistic Value') + xlab('Functional Domain') + labs(fill='Statistic') +
+#  theme(legend.position="bottom")
+
+#barchart_fn_domain_just_environment
+
+#ggsave(barchart_fn_domain_just_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/barchart_fn_domain_just_environment.png')
+
+
+
+
+size_text <- 4
+
 barchart_fn_domain_just_environment <- ggplot(z_meta_all, aes(functional_domain, statistic, fill=stat)) + 
-  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black") +
-  theme(axis.text.x=element_text(angle=45, size = 8),
-        axis.title.x = element_text(vjust=10)) +
-ylab('Statistic Value') + xlab('Functional Domain') + labs(fill='Statistic') +
-  theme(legend.position="bottom")
+  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black", size=.2) +
+  theme(legend.position=c(.3,.75),legend.direction = "vertical") +     
+  theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 30, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text,vjust=4),
+        axis.title.y = element_text(size=size_text,vjust=-1)) +
+  theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) +
+  theme(legend.key.size = unit(.2, "cm")) +
+    geom_errorbar(aes(ymin=statistic-1.96*se, 
+                    ymax=statistic+1.96*se),
+                width=.5,size=.2,
+                position=position_dodge(.9))
+
+
 
 barchart_fn_domain_just_environment
 
-ggsave(barchart_fn_domain_just_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/barchart_fn_domain_just_environment.png')
+ggsave(barchart_fn_domain_just_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_11.jpg',dpi='print',
+       device = 'jpeg', width = 3,height= 2)
+
 
 
 
@@ -2726,14 +2761,14 @@ phewas_meta_ros_liab_all$stat <- 'rtwinSS'
 phewas_meta_rsib_SS_liab_all$stat <- 'rsibSS'
 phewas_meta_rsib_OS_liab_all$stat <- 'rsibOS'
 
-a <- phewas_meta_h2_liab_all %>% select(functional_domain, statistic = h2, stat)
-b <- phewas_meta_c2_liab_all %>% select(functional_domain, statistic = c2, stat)
+a <- phewas_meta_h2_liab_all %>% select(functional_domain, statistic = h2, se=h2_SE, stat)
+b <- phewas_meta_c2_liab_all %>% select(functional_domain, statistic = c2,se=c2_SE, stat)
 #c <- phewas_meta_e2_liab_all %>% select(functional_domain, statistic = e2, stat)
-d <- phewas_meta_ros_liab_all %>% select(functional_domain, statistic = rOS, stat)
-e <- phewas_meta_rss_liab_all %>% select(functional_domain, statistic = rSS, stat)
+d <- phewas_meta_ros_liab_all %>% select(functional_domain, statistic = rOS,se=rOS_SE, stat)
+e <- phewas_meta_rss_liab_all %>% select(functional_domain, statistic = rSS,se=rSS_SE, stat)
 
-f <- phewas_meta_rsib_SS_liab_all %>% select(functional_domain, statistic = rsibSS, stat)
-g <- phewas_meta_rsib_OS_liab_all %>% select(functional_domain, statistic = rsibOS, stat)
+f <- phewas_meta_rsib_SS_liab_all %>% select(functional_domain, statistic = rsibSS, se=rsibSS_SE, stat)
+g <- phewas_meta_rsib_OS_liab_all %>% select(functional_domain, statistic = rsibOS,se=rsibOS_SE, stat)
 
 
 
@@ -3202,6 +3237,204 @@ df_tttt <- fullData_binary_quant %>% select(phewas_code, phewas_description, rli
 
 # Figures
 ## Figure 1
+
+### Generate Mecklenburg Time Series
+
+```{r}
+
+daily_aqi_by_county_2007 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2007.csv") 
+
+
+daily_aqi_by_county_2008 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2008.csv") 
+
+
+daily_aqi_by_county_2009 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2009.csv") 
+
+daily_aqi_by_county_2010 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2010.csv") 
+
+
+daily_aqi_by_county_2011 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2011.csv")
+
+
+daily_aqi_by_county_2012 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2012.csv") 
+
+daily_aqi_by_county_2013 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2013.csv") 
+
+daily_aqi_by_county_2014 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2014.csv") 
+
+daily_aqi_by_county_2015 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2015.csv") 
+
+daily_aqi_by_county_2016 <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/aqi_data/daily_aqi_by_county_2016.csv") 
+
+
+aqi_monthly <- daily_aqi_by_county_2007 %>% bind_rows(.,daily_aqi_by_county_2008,daily_aqi_by_county_2009,
+                                                      daily_aqi_by_county_2010,daily_aqi_by_county_2011,
+                                                      daily_aqi_by_county_2012,daily_aqi_by_county_2013,
+                                                      daily_aqi_by_county_2014,daily_aqi_by_county_2015,
+                                                      daily_aqi_by_county_2016) %>%
+  select(state=`State Name`, county=`county Name`, county_code=`County Code`, Date, AQI) 
+
+
+
+mecklenburg_aqi <- aqi_monthly %>% filter(state=='North Carolina', county == 'Mecklenburg')
+
+
+
+mecklenburg_aqi$Date[366]
+as.numeric(mecklenburg_aqi$Date[366])
+           
+mecklenburg_aqi$Date[2557]
+as.numeric(mecklenburg_aqi$Date[2557])
+
+           
+
+
+
+
+mecklenburg_noaa_sensor <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/var_comp_zipcode_analysis/mecklenburg_noaa_sensor.csv", 
+                                    col_types = cols(`?column?` = col_double(), 
+                                                     startdate = col_character()))
+
+names(mecklenburg_noaa_sensor) <- c('startdate','Temperature')
+
+mecklenburg_noaa_sensor <- mecklenburg_noaa_sensor %>%
+mutate(Date=substring(startdate,0,10)) %>% mutate(Date=parse_datetime(Date, format='%F'))
+
+
+
+mecklenburg_noaa_sensor$Date[9]
+as.numeric(mecklenburg_noaa_sensor$Date[9])
+
+mecklenburg_noaa_sensor$Date[63]
+as.numeric(mecklenburg_noaa_sensor$Date[63])
+
+
+axis_text <- element_text(face = "bold", color = "black", size = 12)
+
+
+
+
+
+library(readr)
+ACS_13_5YR_S1901_with_ann <- read_csv("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/var_comp_zipcode_analysis/ACS_13_5YR_S1901/ACS_13_5YR_S1901_with_ann.csv", 
+                                      skip = 1)
+
+
+income_distribution <- ACS_13_5YR_S1901_with_ann %>% 
+  select(Id2, starts_with('Families;')) %>%
+  select(Id2, contains('Estimate;')) %>%
+  select(-contains('PERCENT IMPUTED')) %>%
+  gather(estimate, percentage, 3:12) %>%
+  separate(estimate,c('fam','est','bracket'), sep = ';') %>% select(-fam,-est) %>%
+  mutate(bracket = trimws(bracket, which=c('both'))) 
+
+
+
+
+income_distribution$bracket <- factor(income_distribution$bracket, 
+                                       levels = c('Less than $10,000',
+                                                  '$10,000 to $14,999',
+                                                  '$15,000 to $24,999',
+                                                  '$25,000 to $34,999',
+                                                  '$35,000 to $49,999',
+                                                  '$50,000 to $74,999',
+                                                  '$75,000 to $99,999',
+                                                  '$100,000 to $149,999',
+                                                  '$150,000 to $199,999',
+                                                  '$200,000 or more'))
+
+
+myLoc <- 
+  (which(levels(income_distribution$bracket) == '$50,000 to $74,999') +
+     which(levels(income_distribution$bracket) == '$75,000 to $99,999')) / 2
+
+
+size_text <- 6
+
+
+income_plot <-  ggplot(income_distribution, aes(x=bracket, y=percentage)) + geom_col(fill='dark green') +
+  xlab('Income Bracket') + ylab('Percentage') +
+  geom_vline(aes(xintercept = myLoc), size=2) +
+    theme(axis.text.x = element_text(angle = 20, size=size_text,hjust = 1), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text)) 
+  
+
+income_plot
+
+
+ts_aqi <- ggplot(mecklenburg_aqi, aes(x = Date, y = AQI)) + 
+  geom_line(color='blue') +
+  xlab('Date') + ylab('Daily AQI') +
+  geom_vline(xintercept =13879, size=2) +
+  geom_vline(xintercept =16070, size=2) +
+    theme(axis.text.x = element_text(angle = 0, size=size_text), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text)) 
+
+
+
+
+
+
+ts_temperature <- ggplot(mecklenburg_noaa_sensor, aes(x = Date, y = Temperature)) + 
+  geom_line(color='red') +
+  geom_vline(xintercept =as.numeric(mecklenburg_noaa_sensor$Date[63]), size=2) +
+  geom_vline(xintercept =as.numeric(mecklenburg_noaa_sensor$Date[9]), size=2) +
+xlab('Date') + ylab('Average Monthly Temp') +
+    theme(axis.text.x = element_text(angle = 0, size=size_text), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text)) 
+
+
+
+ts_both <- ggarrange(ts_aqi, ts_temperature, income_plot, labels=c('d)', 'e)', 'f)'), nrow=3,
+                     font.label = list(size = 8))
+
+
+ts_both
+
+ 
+
+
+
+
+library(magick)
+meck_diagram <- image_read('~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/mecklenburg_grapple_image_v2.png')
+
+
+meck_diagram_ggplot <- image_ggplot(meck_diagram)
+
+
+
+ts_both_picture <- ggarrange(ts_both,meck_diagram_ggplot, labels=c('', 'g)'), ncol=2, font.label = list(size = 8))
+
+
+#ggsave(ts_temperature,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/mecklenburg_ts_noaa.png')
+#ggsave(ts_aqi,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/mecklenburg_ts_AQI.png')
+
+#ggsave(ts_both_picture, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure1b.png')
+
+#ts_both_picture
+
+#ggsave(ts_both, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure1b_left.png')
+
+
+ts_both_picture
+
+
+#ggsave(ts_both,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/mecklenburg_data.png', height=12, width=8)
+
+
+```
+
+
 ```{r}
 map_prevalence_data <- readRDS(all,file = '~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/maps/map_prevalence_data.rds')
 
@@ -3211,7 +3444,9 @@ pp <- ggplot() +
                color = "black", size = 0.25) + 
   coord_map() +
   labs(fill = "Number of Twin Pairs") + xlim(-140,-66) + theme_map() +
-  theme(legend.text=element_text(size=8)) 
+  theme(legend.text=element_text(size=size_text),
+        legend.title = element_text(size=size_text),
+        legend.key.size = unit(.25,'cm')) 
 
 pp
 
@@ -3226,10 +3461,11 @@ popDensityPlot <- ggplot(df_Pop, aes(x=densityBin, y=normalizedPop)) +
   geom_bar(stat='identity', aes(fill = cohort))  + 
   facet_wrap(~cohort,nrow = 1) +
   theme(axis.text.x = element_text(angle = 60, size=1), 
-        axis.text.y = element_text(size=10),
-        axis.title.x = element_text(size=10),
-        axis.title.y = element_text(size=10)) + 
-  theme(legend.text=element_text(size=10)) +
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text),
+        axis.title.y = element_text(size=size_text),
+        strip.text = element_text(size=size_text)) + 
+  theme(legend.text=element_text(size=size_text)) +
   xlab("Log of Population Per Square Mile Area") + 
   ylab("% Total Population")
 
@@ -3240,10 +3476,11 @@ sesDensityPlot <- ggplot(df_SES, aes(x=SES_bin, y=normalizedPop)) +
   geom_bar(stat='identity', aes(fill = cohort))  + 
   facet_wrap(~cohort,nrow = 1) +
   theme(axis.text.x = element_text(angle = 60, size=1), 
-        axis.text.y = element_text(size=10),
-        axis.title.x = element_text(size=10),
-        axis.title.y = element_text(size=10)) + 
-    theme(legend.text=element_text(size=10)) +
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text),
+        axis.title.y = element_text(size=size_text),
+        strip.text = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size_text)) +
   xlab("Depravity Index Score") + ylab("% Total Population") 
 
 
@@ -3259,15 +3496,33 @@ figure1 <- ggarrange(pp,figure1a,labels = c( "a)", ''),  common.legend=FALSE, nr
 figure1
 
 
-ggsave(figure1,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure1.png')
+figure1_combined <- ggarrange(figure1,ts_both_picture, nrow=2,common.legend = FALSE)
+
+figure1_combined
+
+#save_plot(figure1_combined,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure1_combined.png',
+#                    base_aspect_ratio = 1.3 # make room for figure legend
+#          )
 
 
-ggsave(pp, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/twin_map.png')
+
+#ggsave(figure1,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure1a.png')
 
 
-ggsave(popDensityPlot, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/popDensityPlot.png')
+#save_plot(ts_both_picture,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure1b.png')
 
-ggsave(sesDensityPlot, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/sesDensityPlot.png')
+
+
+ggsave(figure1_combined,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure1.pdf', 
+          height = 8.5, width=6.9, units='in', dpi = 'retina', device = 'pdf')
+
+
+#ggsave(pp, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/twin_map.png')
+
+
+#ggsave(popDensityPlot, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/popDensityPlot.png')
+
+#ggsave(sesDensityPlot, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/sesDensityPlot.png')
 
 
 ```
@@ -3275,13 +3530,27 @@ ggsave(sesDensityPlot, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLi
 ## Figure 2
 ```{r}
 
+size_text <- 8
+
+
 
 barchart_fn_domain <- ggplot(z_meta_all, aes(functional_domain, statistic, fill=stat)) + 
-  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black") +
-  theme(axis.text.x=element_text(angle=45, size = 8),
-        axis.title.x = element_text(vjust=10)) +
+  geom_bar(stat="identity", position="dodge", width = 0.85, colour="black",size=.15) +
 ylab('Statistic Value') + xlab('Functional Domain') + labs(fill='Statistic') +
-  theme(legend.position="bottom",legend.box = "horizontal")
+    theme(axis.text.x = element_text(angle = 45, size=size_text, hjust = .9), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text, vjust=.1),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) +
+    theme(legend.direction = "horizontal",legend.position = c(.35,.85)) +
+    geom_errorbar(aes(ymin=statistic-1.96*se, 
+                    ymax=statistic+1.96*se),
+                width=.5,size=.2,
+                position=position_dodge(.9))
+
+
+
+
 
 barchart_fn_domain
 
@@ -3294,14 +3563,19 @@ myColors <- c('lightsalmon1','blue','green', 'yellow2')
 names(myColors) <- levels(fullData_binary_quant$twinPrevalenceCategory)
 
 
+labelSize <- 1.5
 
 p1 <-  ggplot(fullData_binary_quant, aes(h2_liab,observed_h2, label=h2_label)) + 
   geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory))  + 
   xlab('Heritability') + ylab('-log10(p)') +
   geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
     scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
-  geom_text_repel( fontface = "bold", size = 3) 
-
+  geom_text_repel( fontface = "bold", size = labelSize) +
+    theme(axis.text.x = element_text(angle = 0, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text, vjust=.1),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) 
 
 
 
@@ -3315,22 +3589,14 @@ p2 <-  ggplot(fullData_binary_quant, aes(c2_liab,observed_c2, label=c2_label)) +
   xlab('Shared Environmental Variance') + ylab('-log10(p)') +
   geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
     scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
-  geom_text_repel( fontface = "bold", size = 3) 
+  geom_text_repel( fontface = "bold", size = labelSize) +
+    theme(axis.text.x = element_text(angle = 0, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text, vjust=.1),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) 
 
 
-
-
-
-
-
-#p3 <-  ggplot(fullData_binary_quant, aes(e2,observed_e2)) + 
-#  geom_point( alpha =alphaLevel, aes(colour = twinPrevalenceCategory)) + 
-#  xlab('Residual Variance') + ylab('-log10(p)') +
-#  geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed")  +     
-#    scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
-#  geom_text(position='jitter',aes(label=ifelse(( e2_rank ==1  | e2_rank == 2 |  
- #                                                  e2_rank ==5 | e2_rank==7  ),shortName,'')),hjust=1,vjust=1,fontface = "bold", size = 3) +
-#      geom_text(position='jitter',aes(label=ifelse((e2_rank == 3 ),shortName,'')),hjust=0,vjust=1,fontface = "bold", size = 3) 
 
 
 
@@ -3341,7 +3607,14 @@ p4 <-  ggplot(fullData_binary_quant, aes(rliabincome,observed_rliabincome, label
   xlab('Socioeconomic Status Variance Component') + ylab('-log10(p)') +
   geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
     scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
-  geom_text_repel( fontface = "bold", size = 3) 
+  geom_text_repel( fontface = "bold", size = labelSize) +
+    theme(axis.text.x = element_text(angle = 0, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text, vjust=.1),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) 
+
+
 
 
 
@@ -3350,7 +3623,14 @@ p5 <-  ggplot(fullData_binary_quant, aes(rliabaqi,observed_rliabaqi, label=rliab
   geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
     scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
 xlab('Monthly AQI Variance Component') + ylab('-log10(p)') +
-    geom_text_repel( fontface = "bold", size = 3) 
+    geom_text_repel( fontface = "bold", size = labelSize) +
+    theme(axis.text.x = element_text(angle = 0, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text, vjust=.1),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) 
+
+
 
 
 
@@ -3360,33 +3640,51 @@ p6 <-  ggplot(fullData_binary_quant, aes(rliabtemp,observed_rliabtemp, label=rli
   xlab('Monthly Temperature Variance Component') + ylab('-log10(p)') +
   geom_hline(yintercept=thresh_h2$val,colour="#BB0000", linetype="dashed") +     
     scale_colour_manual(name = "Prevalence",values = myColors) + theme(legend.position="none") +
-  geom_text_repel( fontface = "bold", size = 3) 
+  geom_text_repel( fontface = "bold", size = labelSize) +
+    theme(axis.text.x = element_text(angle = 0, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text, vjust=.1),
+        axis.title.y = element_text(size=size_text)) + 
+    theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) 
 
 
 
 
-volcano_plot <- ggarrange(p1,p2, p4 , p5, p6, labels = c( 'b)', 'c)','d)', 'e)' ,'f)' ), common.legend = TRUE, nrow=3,ncol = 2, legend  = 'bottom')
+
+
+volcano_plot <- ggarrange(p1,p2, p4 , p5, p6, labels = c( 'b)', 'c)','d)', 'e)' ,'f)' ), common.legend = TRUE, nrow=3,ncol = 2, legend  = 'bottom',
+                     font.label = list(size = size_text))
 
 
 
 barchart_fn_domain
 
-volcano_bar_chart <- ggarrange(barchart_fn_domain,volcano_plot, labels=c('a)',''), nrow = 2,heights   = 1:2)
+volcano_bar_chart <- ggarrange(barchart_fn_domain,volcano_plot, labels=c('a)',''), nrow = 2,heights   = 1:2,font.label = list(size = size_text))
 
 volcano_bar_chart
 
-ggsave(volcano_bar_chart,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure2.png', height = 12, width = 10)
 
 
 
 
+
+
+
+ggsave(volcano_bar_chart,
+       file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure2.pdf', 
+       height = 8, width = 6.9, units='in', device = 'pdf', dpi = 'retina')
 
 
 
 ```
+
+
+
+
 ## Figure 3 
 ```{r}
 
+size_text <- 8
 
 cost_comorbid_pheno_long <- cost_comorbid_pheno_long %>%
   mutate(statisticType = ifelse(statisticType == 'rSS', 'rtwinSS',statisticType )) %>%
@@ -3403,38 +3701,44 @@ cost_comorbid_ggplot <- ggplot(cost_comorbid_pheno_long, aes(x=as.factor(Descrip
     scale_x_discrete(labels = function(x) str_wrap(x, width = 15)) +
   coord_flip() +
   theme(axis.title = element_text()) + ylab('Statistic Value') + xlab('Phenotype') + labs(color='Statistic Type') +
-  theme(legend.position="bottom")
+  theme(legend.position="bottom") +
+  theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) +
+    theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 0, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text, vjust=.1),
+        axis.title.y = element_text(size=size_text)) 
+
+
+
 
 cost_comorbid_ggplot
 
-#cost_comorbid_ggplot <- ggplot(cost_comorbid_pheno_long, aes(y=statistic, x=as.factor(Description), colour=statisticType)) + 
-#  geom_point(position = position_dodge(width = .5)) +  
-#  geom_errorbar(aes(ymin=statistic-1.96*standard_error, ymax=statistic+1.96*standard_error),) + 
-#  theme(axis.text=element_text(size=8))  + 
-#  scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
-#  theme(axis.title = element_text()) + ylab('Statistic') + xlab('Phenotype') + labs(color='Statistic Type')
-
-#cost_comorbid_ggplot
 
 comparisonplot_publishedLit <- ggplot(twin_h2_c2_comparison_diff_twin_match , aes(h2_match,h2_liab)) + geom_point() + 
     geom_errorbarh(aes(xmin=h2_match-1.96*h2_match_SE, xmax=h2_match+1.96*h2_match_SE),
                    position = position_dodge(width = 0.01), alpha=.2) +
       geom_errorbar(aes(ymin=h2_liab-1.96*h2_liab_SE, ymax=h2_liab+1.96*h2_liab_SE),
                     position = position_dodge(width = 0.01), alpha=.2) + geom_abline(slope = 1, intercept = 0) +
-    geom_smooth(method = "lm", se = TRUE) + xlab('Heritability - Published Studies') + ylab('Heritability - Insurance Study')
+    geom_smooth(method = "lm", se = TRUE) + xlab('Heritability - Published Studies') + ylab('Heritability - Insurance Study') +
+      theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) +
+    theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 0, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text, vjust=.1),
+        axis.title.y = element_text(size=size_text)) 
 
 
 
-figure3 <- ggarrange(comparisonplot_publishedLit,cost_comorbid_ggplot,labels = c( "a)", 'b)'), nrow=2)
+
+
+
+figure3 <- ggarrange(comparisonplot_publishedLit,cost_comorbid_ggplot,labels = c( "a)", 'b)'), nrow=2,ncol = 1,font.label = list(size = size_text))
 
 figure3
 
-ggsave(figure3,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure3.png',height = 12, width = 10)
-
-ggsave(comparisonplot_publishedLit,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/comparisonplot_publishedLit.png',height = 6, width = 10)
-
-
-
+ggsave(figure3,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure3.pdf',
+height = 7, width = 6.9, device = 'pdf', dpi = 'retina')
 
 
 
@@ -3445,213 +3749,354 @@ ggsave(comparisonplot_publishedLit,file='~/Dropbox (RagGroup)/RagGroup Team Fold
 ## Figure 4
 ```{r}
 
+size_text <- 8
+
+
 h2_liab_ggplot <- ggplot(metaAll_justMatch_h2, aes(y=h2, x=functional_domain, colour=category)) + 
   geom_point(position = position_dodge(width = .5)) +  
   geom_errorbar(aes(ymin=h2-1.96*h2_SE, ymax=h2+1.96*h2_SE),position = position_dodge(width = 0.5)) + 
   coord_flip() +  
-  theme(axis.text=element_text(size=8))  + 
+  theme(axis.text=element_text(size=size_text))  + 
   scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
-  theme(axis.title = element_text()) + ylab('Heritability (h2)') + xlab('Functional Domain')
+  theme(axis.title = element_text(size=size_text)) + ylab('Heritability (h2)') + xlab('Functional Domain') +
+      theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) 
 
 
-ggsave(h2_liab_ggplot,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/h2_liab_comparison_match.png', height=3.5, width=6)
+
+#ggsave(h2_liab_ggplot,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/h2_liab_comparison_match.png', height=3.5, width=6)
 
 
 c2_liab_ggplot <- ggplot(metaAll_justMatch_c2, aes(y=c2, x=functional_domain, colour=category)) + 
   geom_point(position = position_dodge(width = .5)) +  
   geom_errorbar(aes(ymin=c2-1.96*c2_SE, ymax=c2+1.96*c2_SE),position = position_dodge(width = 0.5)) + 
   coord_flip() +     
-  theme(axis.text=element_text(size=8))  + 
+  theme(axis.text=element_text(size=size_text))  + 
   scale_x_discrete(labels = function(x) str_wrap(x, width = 80)) +
-  theme(axis.title = element_text()) + ylab('Shared Environmental Variance (c2)') + xlab('Functional Domain')
+  theme(axis.title = element_text(size=size_text)) + ylab('Shared Environmental Variance (c2)') + xlab('Functional Domain') +     theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) 
 
 
 
-ggsave(c2_liab_ggplot,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/c2_liab_comparison_match.png', height=3.5, width=6)
+
+#ggsave(c2_liab_ggplot,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/c2_liab_comparison_match.png', height=3.5, width=6)
 
 
 
-figure4 <- ggarrange(h2_liab_ggplot,c2_liab_ggplot,labels = c( "a)", 'b)'), nrow = 2, ncol = 1, common.legend=TRUE,legend='bottom' )
+figure4 <- ggarrange(h2_liab_ggplot,c2_liab_ggplot,labels = c( "a)", 'b)'), nrow = 2, ncol = 1, common.legend=TRUE,legend='bottom',font.label = list(size = size_text) )
 
 #h2_c2_MaTCH
 figure4
 
-ggsave(figure4,file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure4.png', height = 10, width=8)
+ggsave(figure4,
+       file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/figure4.pdf', 
+       height = 6, width=6, units = 'in', device='pdf', dpi='retina')
 
 
 ```
 
 
-# Extra Stuff
-## How h2/c2 estimates change when using different values of p
+
+# Supplementary Data
+
+## Supplementary Figure 1
 ```{r}
 
-p_low <- 0.330
-p_high <- 0.625
+size_text <- 3
 
-comparison_h2_c2_p <- allphewas_both %>%
-  mutate(h2_low = (2/p_low)*(rliabss-rliabos),
-         h2_high= (2/p_high)*(rliabss-rliabos),
-         c2_low = ((p_low+1)*rliabos-rliabss)/p_low,
-         c2_high = ((p_high+1)*rliabos-rliabss)/p_high) %>%
-  select(h2_liab, c2_liab, h2_low, h2_high, c2_low, c2_high) %>%
-  mutate(diff_h2_low = h2_liab- h2_low, 
-         diff_h2_high=h2_liab- h2_high,
-         diff_c2_low = c2_liab- c2_low, 
-         diff_c2_high=c2_liab- c2_high) 
-  
-mean(comparison_h2_c2_p$diff_h2_low, na.rm=TRUE)
-mean(comparison_h2_c2_p$diff_h2_high, na.rm=TRUE)
-mean(comparison_h2_c2_p$diff_c2_low, na.rm=TRUE)
-mean(comparison_h2_c2_p$diff_c2_high, na.rm=TRUE)
+plot_fig <- ggplot(prev, aes(x=functional_domain, y=prevalence)) +
+  geom_boxplot(aes(colour=category), outlier.alpha = 0.4,size=.2,outlier.size = .3) + 
+   scale_y_log10() +
+ ylab('Prevalence') + xlab('Functional Domain') +
+  theme(legend.position=c(-.15,-.1),legend.box = "horizontal") +     theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 30, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text,vjust=4),
+        axis.title.y = element_text(size=size_text,vjust=-1)) +
+  theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) +
+  theme(legend.key.size = unit(.3, "cm")) +
+  theme(plot.margin=grid::unit(c(t=.2,r=.1,b=-1,l=0), "mm"))
+
+
+
+plot_fig <- ggplot(prev, aes(x=functional_domain, y=prevalence)) +
+  geom_boxplot(aes(colour=category), outlier.alpha = 0.4,size=.2,outlier.size = .3) + 
+   scale_y_log10() +
+ ylab('Prevalence') + xlab('Functional Domain') +
+  theme(legend.position=c(-.15,-.1),legend.box = "horizontal") +     
+  theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 30, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text,vjust=4),
+        axis.title.y = element_text(size=size_text,vjust=-1)) +
+  theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) +
+  theme(legend.key.size = unit(.3, "cm")) +
+  theme(plot.margin=grid::unit(c(t=.2,r=.1,b=-1,l=0), "mm"))
+
+
+
+
+plot_fig
+
+
+ggsave(plot_fig, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_1.jpg',dpi='print' , device = 'jpeg', width = 3,height= 2)
+
+
+
+
+```
+
+
+## Supplementary Figure 2
+```{r}
+
+size_text <- 6
+
+
+correlation_sibOS_sibSS <- ggplot(allphewas_sibling_correlation , aes(rliabsibling_SS,rliabsibling_OS)) + geom_point(size=.03) + 
+    geom_errorbarh(aes(xmin=rliabsibling_SS-1.96*rliabsibling_SE_SS, xmax=rliabsibling_SS+1.96*rliabsibling_SE_SS),
+                   position = position_dodge(width = 0.01), alpha=.2, size=.2) +
+      geom_errorbar(aes(ymin=rliabsibling_OS-1.96*rliabsibling_SE_OS, ymax=rliabsibling_OS+1.96*rliabsibling_SE_OS),
+                    position = position_dodge(width = 0.01), alpha=.2, size=.2) + 
+  geom_abline(slope = 1, intercept = 0) +
+  xlab('Sibling Same Sex Correlation') + ylab('Sibling Opposite Sex Correlation')  +
+  geom_smooth(method = "lm", se = TRUE)  +
+    theme(axis.title.x = element_text(size=size_text), 
+          axis.title.y = element_text(size=size_text),
+        axis.text.y = element_text(size=size_text),
+        axis.text.x = element_text(size=size_text)
+) 
+
+
+
+correlation_sibOS_sibSS
+
+
+ggsave(correlation_sibOS_sibSS, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_2.jpg',dpi='print' , device = 'jpeg', width = 3,height= 2)
+
 
 ```
 
 
 
+### Supplementary Figure 3
+```{r}
+allphewas_sibling_correlation_dff <- allphewas_sibling_correlation %>%
+  mutate(rsib_diff=rliabsibling_SS-rliabsibling_OS)
 
-### Weighted Analysis
+diff_sib_corOS_corSS <- ggplot(allphewas_sibling_correlation_dff, aes(rsib_diff)) +
+  geom_histogram(bins = 60) + xlab("Same Sex Correlation - Opposite Sex Correlation") +
+      theme(axis.title.x = element_text(size=size_text), 
+          axis.title.y = element_text(size=size_text),
+        axis.text.y = element_text(size=size_text),
+        axis.text.x = element_text(size=size_text)
+) 
+
+
+diff_sib_corOS_corSS
+
+ggsave(diff_sib_corOS_corSS, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_3.jpg',dpi='print', 
+       device = 'jpeg', width = 3,height= 2)
+
+
+```
+
+### Supplementary Figure 4
+```{r}
+
+size_text <- 4
+
+correlation_twinOS_sibOS <- ggplot(allphewas_all_correlation_sibling_twin , aes(rliabos,rliabsibling_OS)) + geom_point(size=.03) + 
+    geom_errorbarh(aes(xmin=rliabos-1.96*rliabos_SE, xmax=rliabos+1.96*rliabos_SE),
+                   position = position_dodge(width = 0.01), alpha=.2, size=.2) +
+      geom_errorbar(aes(ymin=rliabsibling_OS-1.96*rliabsibling_SE_OS, ymax=rliabsibling_OS+1.96*rliabsibling_SE_OS),
+                    position = position_dodge(width = 0.01), alpha=.2, size=.2) + geom_abline(slope = 1, intercept = 0) + 
+  xlab('Twin Opposite Sex Correlation') + 
+  ylab('Sibling Opposite Sex Correlation') +
+        theme(axis.title.x = element_text(size=size_text), 
+          axis.title.y = element_text(size=size_text),
+        axis.text.y = element_text(size=size_text),
+        axis.text.x = element_text(size=size_text)
+) 
+
+
+
+
+
+correlation_twinOS_sibSS <- ggplot(allphewas_all_correlation_sibling_twin , aes(rliabos,rliabsibling_SS)) + geom_point(size=.03) + 
+    geom_errorbarh(aes(xmin=rliabos-1.96*rliabos_SE, xmax=rliabos+1.96*rliabos_SE),
+                   position = position_dodge(width = 0.01), alpha=.2) +
+      geom_errorbar(aes(ymin=rliabsibling_SS-1.96*rliabsibling_SE_SS, ymax=rliabsibling_SS+1.96*rliabsibling_SE_SS),
+                    position = position_dodge(width = 0.01), alpha=.2) + geom_abline(slope = 1, intercept = 0) + 
+  xlab('Twin Opposite Sex Correlation') + 
+  ylab('Sibling Same Sex Correlation') +
+        theme(axis.title.x = element_text(size=size_text), 
+          axis.title.y = element_text(size=size_text),
+        axis.text.y = element_text(size=size_text),
+        axis.text.x = element_text(size=size_text)
+) 
+
+
+
+correlation_twinOS_sibSS_sibOS <- ggarrange(correlation_twinOS_sibOS,correlation_twinOS_sibSS,labels = c( 'a)','b)'),  
+                      ncol = 2,
+                      font.label = list(size = size_text))
+
+ggsave(correlation_twinOS_sibSS_sibOS, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_4.jpg',dpi='print', 
+       device = 'jpeg', width = 3,height= 2)
+
+correlation_twinOS_sibSS_sibOS
+
+```
+
+### Supplementary Figure 5
 ```{r, eval=FALSE}
 
-phewas <- read.table("~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/analysis/phewasAllDescription.csv", header=TRUE)
+size_text <- 4
+
+barchart_fn_domain_environment <- ggplot(z_meta_all, aes(functional_domain, statistic, fill=stat)) + 
+  geom_bar(stat="identity", position="dodge", width = 0.75, colour="black", size=.2) +
+  theme(legend.position=c(.5,.75),legend.direction = "horizontal") +     
+  theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 30, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text,vjust=4),
+        axis.title.y = element_text(size=size_text,vjust=-1)) +
+  theme(legend.text=element_text(size=size_text), legend.title = element_text(size=size_text)) +
+  theme(legend.key.size = unit(.2, "cm")) 
 
 
-allphewas_binary_weighting <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/twin_binary_weighted.csv", 
-    " ", escape_double = FALSE, col_names = FALSE, 
+barchart_fn_domain_environment
+
+
+ggsave(barchart_fn_domain_environment, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_5.jpg',dpi='print', 
+       device = 'jpeg', width = 3,height= 2)
+
+
+
+```
+
+
+### Supplementary Figure 7
+```{r}
+
+
+size_text <- 4
+
+
+
+twinPairsYOB <- read_delim("~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/twinPairsYOB.csv", 
+    "\t", escape_double = FALSE, col_types = cols(phewas_code = col_character()), 
     trim_ws = TRUE)
 
-names(allphewas_binary_weighting) <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/names_binary_weighting.rds')
+
+twinPairsYOB <- twinPairsYOB %>% inner_join(.,quant_pheno_description, by='phewas_code')
 
 
-phewas_high_K <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/manuscript_data/phewas_high_K.rds')
+twinPairsYOB <- twinPairsYOB %>% mutate(Description = ifelse(phewas_code == 'COST','Binary Phenotypes', Description))
+
+ggplot_ageDistribution <- ggplot(twinPairsYOB, aes(YOB, fill = Description, colour = Description)) + 
+  geom_density(alpha = 0.1) + facet_wrap(~Description) +
+  theme(axis.text.x=element_text(angle=45, size = 8),
+        axis.title.x = element_text(vjust=2)) +
+ylab('Density') + xlab('Year of Birth') +
+theme(legend.position="none") +
+          theme(axis.title.x = element_text(size=size_text), 
+          axis.title.y = element_text(size=size_text),
+        axis.text.y = element_text(size=size_text),
+        axis.text.x = element_text(size=size_text),
+      strip.text = element_text(size=size_text)
+) 
 
 
-allphewas_binary_weighting <- allphewas_binary_weighting %>% 
-  mutate(h2_liab_SE_se = ifelse(phewas_code == '984',h2_SE,h2_liab_SE_se)) %>%
-  mutate(rliabss_SE_se = ifelse(phewas_code == '984',r_SS_SE,rliabss_SE_se)) %>%
-  mutate(c2_liab_SE_se = ifelse(phewas_code == '984',c2_SE,c2_liab_SE_se)) %>%
-    mutate(rliabos_SE_se = ifelse(phewas_code == '984',r_OS_SE,rliabos_SE_se)) 
+  
 
 
-names(allphewas_binary_weighting) <- sub("_se", "", names(allphewas_binary_weighting))
+ggplot_ageDistribution
 
-
-
-allphewas_binary_weighting <- allphewas_binary_weighting %>% left_join(phewas, ., by='phewas_code')  %>% right_join(.,phewas_high_K, by='phewas_code')
-
-
-
-missingPhenoWeighting <- allphewas_binary_weighting %>% 
-  filter(is.na(h2_liab)) %>% select(phewas_code)
-
-
-saveRDS(missingPhenoWeighting, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/orchestraAnalysis/missingPhenoWeighting.rds' )
-
-missingPhenoWeighting
-
-
-dfWeight <- allphewas_binary_weighting %>% 
-  select(phewas_code,phewas_description ,h2_liab_weight=h2_liab, h2_liab_SE_weight=h2_liab_SE, 
-         c2_liab_weight=c2_liab, c2_liab_SE_weight=c2_liab_SE)
-
-
-dfunWeight <- allphewas_both %>% 
-  select(phewas_code ,h2_liab, h2_liab_SE, c2_liab, c2_liab_SE)
-
-df_weight_unweight <- dfWeight %>% inner_join(.,dfunWeight, by ='phewas_code')
+ggsave(ggplot_ageDistribution, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_7.jpg',dpi='print', 
+       device = 'jpeg', width = 3,height= 2)
 
 
 
+```
 
- ggplot(df_weight_unweight , aes(h2_liab_weight,h2_liab)) + geom_point() + 
-    geom_smooth(method = "lm", se = TRUE) + geom_abline(slope = 1, intercept = 0)
+### Supplementary Figure 8
+```{r}
+coefficients_age_gender <- allphewas_both_functional_domain %>% dplyr::select(phewas_code,functional_domain,beta_gender=`as.factor(Gender)M`, beta_age=MemberBirthYear) %>%
+  filter(!is.na(functional_domain))
 
- 
-  ggplot(df_weight_unweight , aes(c2_liab_weight,c2_liab)) + geom_point() + 
-    geom_smooth(method = "lm", se = TRUE) + geom_abline(slope = 1, intercept = 0)
 
- 
+
+coefficients_age_gender$functional_domain <- factor(coefficients_age_gender$functional_domain, 
+                                                 levels = c('All Traits',
+                                                            'Aging',
+                                                            'Cardiovascular',
+                                                            'Cognitive',
+                                                            'Connective tissue',
+                                                            'Dermatological',
+                                                            'Developmental',
+                                                            'Ear,Nose,Throat',
+                                                            'Endocrine',
+                                                            'Environment',
+                                                            'Gastrointestinal',
+                                                            'Hematological',
+                                                            'Immunological',
+                                                            'Infection',
+                                                            'Metabolic',
+                                                            'Neoplasms',
+                                                            'Neurological',
+                                                            'Ophthalmological',
+                                                            'Psychiatric',
+                                                            'Reproduction',
+                                                            'Respiratory',
+                                                            'Skeletal'))
+
+
+coefficients_age_gender <- coefficients_age_gender %>% filter(!is.na(functional_domain))
+
+
+plot_coefficient_gender <- ggplot(coefficients_age_gender, aes(x=functional_domain, y=beta_gender)) +
+  geom_boxplot(aes(colour=functional_domain), outlier.alpha = 0.4,size=.2,outlier.size = .3) + 
+   scale_y_log10() +
+ ylab('Effect Size - Gender') + xlab('Functional Domain') +
+  theme(legend.position=c(.3,.95),legend.direction = "horizontal") +     theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 30, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text,vjust=4),
+        axis.title.y = element_text(size=size_text,vjust=-1)) +
+  theme(legend.text=element_text(size=size_text-2), legend.title = element_text(size=size_text-2)) +
+  theme(legend.key.size = unit(.1, "cm")) 
+
+ggsave(plot_coefficient_gender, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_8.jpg',dpi='print',
+       device = 'jpeg', width = 3,height= 2)
+
+plot_coefficient_gender
+
 ```
 
 
 
 
+### Supplementary Figure 9
 ```{r}
 
-qdf <- allphewas_both_zipcode %>% select(rliabincome_SE)
 
-```
+plot_coefficient_age <- ggplot(coefficients_age_gender, aes(x=functional_domain, y=beta_age)) +
+  geom_boxplot(aes(colour=functional_domain), outlier.alpha = 0.4,size=.2,outlier.size = .3) + 
+   scale_y_log10() +
+ ylab('Effect Size - Age') + xlab('Functional Domain') +
+  theme(legend.position=c(.3,.95),legend.direction = "horizontal") +     
+  theme(axis.text=element_text(size=size_text))  +
+      theme(axis.text.x = element_text(angle = 30, size=size_text, hjust = .75), 
+        axis.text.y = element_text(size=size_text),
+        axis.title.x = element_text(size=size_text,vjust=4),
+        axis.title.y = element_text(size=size_text,vjust=-1)) +
+  theme(legend.text=element_text(size=size_text-2), legend.title = element_text(size=size_text-2)) +
+  theme(legend.key.size = unit(.1, "cm")) 
 
+ggsave(plot_coefficient_age, file='~/Dropbox (RagGroup)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/manuscript_files/figures/supp_figure_9.jpg',dpi='print',
+       device = 'jpeg', width = 3,height= 2)
 
-
-
-###Data frames for Braden
-```{r}
-
-braden_allphenotypes_noenvironment <- allphewas_both %>% 
-  inner_join(.,allphewas_sibling_correlation %>% select(phewas_code,rliabsibling_SS,rliabsibling_SE_SS,rliabsibling_OS,rliabsibling_SE_OS), by='phewas_code') %>%
-  select(phewas_code, phewas_description,shortName,
-         h2=h2_liab, h2_SE=h2_liab_SE, h2.zscore=h2_liab.zscore, h2.pvalue=h2_liab.pvalue,
-         c2=c2_liab, c2_SE=c2_liab_SE, c2.zscore=c2_liab.zscore, c2.pvalue=c2_liab.pvalue,
-         rtwinss=rliabss, rtwinss_SE=rliabss_SE, rtwinss.zscore=rliabss_liab.zscore, rtwinss.pvalue=rliabss_liab.pvalue,
-         rtwinos=rliabos, rtwinos_SE=rliabos_SE, rtwinos.zscore=rliabos_liab.zscore, rtwinos.pvalue=rliabos_liab.pvalue, 
-         prevalence,
-         rsibSS = rliabsibling_SS, rsibSS_SE = rliabsibling_SE_SS,
-         rsibOS = rliabsibling_OS, rsibOS_SE = rliabsibling_SE_OS, 
-         prevalence, observed_h2, observed_c2, observed_rliabss,
-         observed_rliabos) %>%
-  mutate(rsibSS.zscore=rsibSS/rsibSS_SE) %>%
-  mutate(rsibSS.pvalue=2*pnorm(-abs(rsibSS.zscore))) %>%
-  mutate(rsibOS.zscore=rsibOS/rsibOS_SE) %>%
-  mutate(rsibOS.pvalue=2*pnorm(-abs(rsibOS.zscore))) %>%
-    mutate(twinPrevalenceCategory = as.character(cut(prevalence, breaks=c(0,.10,.30,.80),include.lowest=TRUE,right=FALSE))) 
-
-
-
-braden_allphenotypes_environment <- allphewas_both_zipcode %>%
-  select(phewas_code, phewas_description, shortName,
-         h2=h2_liab, h2_SE=h2_liab_SE, h2.zscore=h2_liab.zscore, h2.pvalue=h2_liab.pvalue,
-         c2=c2_liab, c2_SE=c2_liab_SE, c2.zscore=c2_liab.zscore, c2.pvalue=c2_liab.pvalue,
-         rtwinss=rliabss, rtwinss_SE=rliabss_SE, rtwinss.zscore=rliabss_liab.zscore, rtwinss.pvalue=rliabss_liab.pvalue,
-         rtwinos=rliabos, rtwinos_SE=rliabos_SE, rtwinos.zscore=rliabos_liab.zscore, rtwinos.pvalue=rliabos_liab.pvalue,
-         prevalence,
-         var_ses=rliabincome, var_ses_SE=rliabincome_SE, var_ses.zscore=rliabincome.zscore, var_ses.pvalue=rliabincome.pvalue,
-         var_aqi=rliabaqi, var_aqi_SE=rliabaqi_SE, var_aqi.zscore=rliabaqi.zscore, var_aqi.pvalue=rliabaqi.pvalue,
-         var_temp=rliabtemp, var_temp_SE=rliabtemp_SE, var_temp.zscore=rliabtemp.zscore, var_temp.pvalue=rliabtemp.pvalue, observed_h2, observed_c2, observed_rliabss, observed_rliabos,
-         observed_rliabincome, observed_rliabaqi, observed_rliabtemp) %>%
-    mutate(twinPrevalenceCategory = as.character(cut(prevalence, breaks=c(0,.10,.30,.80),include.lowest=TRUE,right=FALSE))) 
-
-
-
-
-saveRDS(braden_allphenotypes_noenvironment, file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/updated_data/allphenotypes_noenvironment.rds')
-
-
-saveRDS(braden_allphenotypes_environment, file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/updated_data/allphenotypes_environment.rds')
-
-
-saveRDS(braden_df_meta_analytic_estimates_environment, file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/updated_data/meta_analytic_estimates_environment.rds')
-
-saveRDS(braden_df_meta_analytic_estimates_noenvironment, file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/updated_data/meta_analytic_estimates_noenvironment.rds')
-
-
-
-
-metaAll_justMatch_both <- metaAll_justMatch_h2 %>% full_join(.,metaAll_justMatch_c2, by=c('functional_domain','category'))
-
-saveRDS(metaAll_justMatch_both, file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/updated_data/insurance_matchComparison.rds')
-
-
-phewas_code_functional_domain <- allphewas_both_functional_domain %>% select(phewas_code, functional_domain) 
-
-saveRDS(phewas_code_functional_domain, file='~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/updated_data/phewas_code_functional_domain.rds')
-
-
-#z1z1 <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/allphenotypes_noenvironment.rds')
-
-
-#z2z2 <- readRDS('~/Dropbox (HMS)/RagGroup Team Folder/geneticLinkageAetna/manuscript_analysis/shiny_data/allphenotypes_environment.rds')
-
+plot_coefficient_age
 
 
 
@@ -3659,18 +4104,3 @@ saveRDS(phewas_code_functional_domain, file='~/Dropbox (HMS)/RagGroup Team Folde
 
 
 
-```{r}
-z_simplify <- round_df(allphewas_both %>%
-                         mutate(h2_low=h2_liab - 1.96*h2_liab_SE, 
-                                h2_high=h2_liab + 1.96*h2_liab_SE,
-                                c2_low=c2_liab - 1.96*c2_liab_SE,
-                                c2_high = c2_liab + 1.96*c2_liab_SE), digits = 3)
-
-DT::datatable(z_simplify)
-
-a <- round_df(data.frame(c1=.04/100.0), digits = 3) %>%
-  mutate(c1=c1*100)
-
-a
-
-```
